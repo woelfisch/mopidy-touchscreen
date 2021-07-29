@@ -1,11 +1,304 @@
+import pygame
 import logging
 import math
 
-import pygame
-
+from .input_manager import InputManager
 
 logger = logging.getLogger(__name__)
 
+
+
+change_speed = 2
+
+
+class DynamicBackground:
+
+    def __init__(self, size):
+        self.image_loaded = False
+        self.size = size
+        self.surface = pygame.Surface(self.size).convert()
+        self.surface.fill((145, 16, 16))
+        self.surface_image = pygame.Surface(self.size).convert()
+        self.surface_image.fill((145, 16, 16))
+        self.surface_image_last = pygame.Surface(self.size).convert()
+        self.update = True
+        self.screen_change_percent = 100
+
+    def draw_background(self):
+        self.update_background()
+        return self.surface.copy()
+
+    def draw_background_in_rects(self, surface, rects):
+        self.update_background()
+        for rect in rects:
+            surface.blit(self.surface, rect, area=rect)
+
+    def update_background(self):
+        if self.image_loaded:
+            if self.screen_change_percent < 255:
+                self.surface.fill((0, 0, 0))
+                self.surface_image_last.set_alpha(
+                    255 - self.screen_change_percent)
+                self.surface_image.set_alpha(self.screen_change_percent)
+                self.surface.blit(self.surface_image_last, (0, 0))
+                self.surface.blit(self.surface_image, (0, 0))
+                self.screen_change_percent += 5
+                self.update = True
+
+    def should_update(self):
+        if self.update:
+            self.update = False
+            return True
+        else:
+            return False
+
+    def set_background_image(self, image):
+        if image is not None:
+            image_size = get_aspect_scale_size(image, self.size)
+            target = pygame.transform.smoothscale(image, image_size)
+            self.surface_image_last = self.surface_image.copy()
+            pos = (int((self.size[0] - image_size[0])/2),
+                   (int(self.size[1] - image_size[1])/2))
+            self.surface_image.blit(blur_surf_times(
+                target, self.size[0]/40, 10), pos)
+            self.screen_change_percent = 0
+            self.image_loaded = True
+        self.update = True
+
+
+def get_aspect_scale_size(img, new_size):
+    size = img.get_size()
+    aspect_x = new_size[0] / float(size[0])
+    aspect_y = new_size[1] / float(size[1])
+    if aspect_x > aspect_y:
+        aspect = aspect_x
+    else:
+        aspect = aspect_y
+    new_size = (int(aspect*size[0]), int(aspect*size[1]))
+    return new_size
+
+
+def blur_surf_times(surface, amt, times):
+    for i in range(times):
+        surface = blur_surf(surface, amt)
+    return surface
+
+
+# http://www.akeric.com/blog/?p=720
+def blur_surf(surface, amt):
+    """
+    Blur the given surface by the given 'amount'.  Only values 1 and greater
+    are valid.  Value 1 = no blur.
+    """
+
+    scale = 1.0/float(amt)
+    surf_size = surface.get_size()
+    scale_size = (int(surf_size[0]*scale), int(surf_size[1]*scale))
+    surf = pygame.transform.smoothscale(surface, scale_size)
+    surf = pygame.transform.smoothscale(surf, surf_size)
+    return surf
+
+class ListView():
+    def __init__(self, pos, size, base_size, font):
+        self.size = size
+        self.pos = pos
+        self.base_size = base_size
+        self.screen_objects = ScreenObjectsManager()
+        self.max_rows = int(self.size[1] / font.size("TEXT SIZE")[1]) # DUDE!!!11 font.size() returns a float!
+        self.current_item = 0
+        self.font = font
+        self.list_size = 0
+        self.list = []
+        self.scrollbar = False
+        self.selected = None
+        self.active = []
+        self.set_list([])
+        self.update_keys = []
+
+    # Sets the list for the lisview.
+    # It should be an iterable of strings
+    def set_list(self, item_list):
+        self.screen_objects.clear()
+        self.list = item_list
+        self.list_size = len(item_list)
+        if self.max_rows < self.list_size:
+            self.scrollbar = True
+            scroll_bar = ScrollBar(
+                (self.pos[0] + self.size[0] - self.base_size,
+                 self.pos[1]),
+                (self.base_size, self.size[1]), self.list_size,
+                self.max_rows)
+            self.screen_objects.set_touch_object("scrollbar",
+                                                 scroll_bar)
+        else:
+            self.scrollbar = False
+        if self.list_size > 0:
+            self.selected = 0
+        else:
+            self.selected = None
+        self.load_new_item_position(0)
+
+    # Will load items currently displaying in item_pos
+    def load_new_item_position(self, item_pos):
+        assert(isinstance(item_pos, int))
+        self.update_keys = []
+        self.current_item = item_pos
+        if self.scrollbar:
+            self.screen_objects.clear_touch(["scrollbar"])
+        else:
+            self.screen_objects.clear_touch(None)
+        i = self.current_item
+        z = 0
+        if self.scrollbar:
+            width = self.size[0] - self.base_size
+        else:
+            width = self.size[0]
+        self.should_update_always = False
+        current_y = self.pos[1]
+        while i < self.list_size and current_y <= self.pos[1] + self.size[1]:
+            item = TouchAndTextItem(self.font, self.list[i], (
+                self.pos[0],
+                current_y), (width, -1))
+            current_y += item.size[1]
+            if not item.fit_horizontal:
+                self.update_keys.append(str(i))
+            self.screen_objects.set_touch_object(str(i), item)
+            i += 1
+            z += 1
+        self.reload_selected()
+
+    def should_update(self):
+        if len(self.update_keys) > 0:
+            return True
+        else:
+            return False
+
+    def find_update_rects(self, rects):
+        for key in self.update_keys:
+            object = self.screen_objects.get_touch_object(key)
+            rects.append(object.rect_in_pos)
+
+    def render(self, surface, update_all, rects):
+        if update_all:
+            self.screen_objects.render(surface)
+        else:
+            for key in self.update_keys:
+                object = self.screen_objects.get_touch_object(key)
+                object.update()
+                object.render(surface)
+
+    def touch_event(self, touch_event):
+        self.must_update = True
+        if touch_event.type == InputManager.click \
+                or touch_event.type == InputManager.long_click:
+            objects = self.screen_objects.get_touch_objects_in_pos(
+                touch_event.current_pos)
+            if objects is not None:
+                for key in objects:
+                    if key == "scrollbar":
+                        direction = \
+                            self.screen_objects.get_touch_object(
+                                key).touch(touch_event.current_pos)
+                        if direction != 0:
+                            self.move_to(direction)
+                    else:
+                        return int(key)
+        elif (touch_event.type == InputManager.key and
+                self.selected is not None):
+            if touch_event.direction == InputManager.enter:
+                if self.selected is not None:
+                    return self.selected
+            elif touch_event.direction == InputManager.up:
+                self.set_selected(self.selected-1)
+            elif touch_event.direction == InputManager.down:
+                self.set_selected(self.selected+1)
+        elif touch_event.type == InputManager.swipe:
+            if touch_event.direction == InputManager.up:
+                self.move_to(-1)
+            elif touch_event.direction == InputManager.down:
+                self.move_to(1)
+
+    # Scroll to direction
+    # direction == 1 will scroll down
+    # direction == -1 will scroll up
+    def move_to(self, direction):
+        assert(isinstance(self.max_rows, int))
+        if self.scrollbar:
+            if direction == 1:
+                self.current_item += self.max_rows
+                if self.current_item + self.max_rows > self.list_size:
+                    self.current_item = self.list_size - self.max_rows
+                self.load_new_item_position(self.current_item)
+                self.screen_objects.get_touch_object(
+                    "scrollbar").set_item(
+                    self.current_item)
+            elif direction == -1:
+                self.current_item -= self.max_rows
+                if self.current_item < 0:
+                    self.current_item = 0
+                self.load_new_item_position(self.current_item)
+                self.screen_objects.get_touch_object(
+                    "scrollbar").set_item(
+                    self.current_item)
+            self.set_active(self.active)
+
+    # Set active items
+    def set_active(self, active):
+        self.must_update = True
+        for number in self.active:
+            try:
+                self.screen_objects.get_touch_object(
+                    str(number)).set_active(
+                    False)
+            except KeyError:
+                pass
+        for number in active:
+            try:
+                self.screen_objects.get_touch_object(
+                    str(number)).set_active(
+                    True)
+            except KeyError:
+                pass
+        self.active = active
+
+    def set_selected(self, selected):
+        self.must_update = True
+        if selected > -1 and selected < len(self.list):
+            if self.selected is not None:
+                try:
+                    self.screen_objects.get_touch_object(
+                        str(self.selected)).set_selected(
+                        False)
+                except KeyError:
+                    pass
+            if selected is not None:
+                try:
+                    self.screen_objects.get_touch_object(
+                        str(selected)).set_selected(
+                        True)
+                except KeyError:
+                    pass
+            self.selected = selected
+            self.set_selected_on_screen()
+
+    def set_selected_on_screen(self):
+        self.must_update = True
+        if self.current_item + self.max_rows <= self.selected:
+            self.move_to(1)
+            self.set_selected_on_screen()
+        elif self.current_item > self.selected:
+            self.move_to(-1)
+            self.set_selected_on_screen()
+
+    def reload_selected(self):
+        self.must_update = True
+        if self.selected is not None:
+            try:
+                self.screen_objects.get_touch_object(
+                    str(self.selected)).set_selected(
+                        True)
+            except KeyError:
+                pass
 
 class ScreenObjectsManager:
     def __init__(self):
@@ -94,6 +387,9 @@ class TextItem(BaseItem):
 
     def __init__(self, font, text, pos, size, center=False, background=None,
                  scroll_no_fit=True):
+
+        logger.debug(f'type of text is {type(text)}')
+
         self.font = font
         self.text = text
         self.scroll_no_fit = scroll_no_fit
@@ -208,7 +504,7 @@ class TouchObject(BaseItem):
             self.selected_box_rectangle.convert_alpha()
         pygame.draw.rect(self.selected_box_rectangle, (255, 255, 255),
                          self.selected_box_rectangle.get_rect(),
-                         size[1]/10+1)
+                         int(size[1]/10)+1)
 
     def is_pos_inside(self, pos):
         return self.rect_in_pos.collidepoint(pos)
@@ -286,7 +582,7 @@ class Progressbar(TouchObject):
             .convert_alpha()
         pygame.draw.rect(self.rectangle, (255, 255, 255),
                          self.rectangle.get_rect(),
-                         size[1]/20+1)
+                         int(size[1]/20)+1)
 
     def render(self, surface):
         surface.blit(self.surface, self.pos)
@@ -349,6 +645,7 @@ class ScrollBar(TouchObject):
             return 0
 
     def set_item(self, current_item):
+        assert(isinstance(current_item, int))
         self.current_item = current_item
         self.bar_pos = float(self.current_item) / float(
             self.max) * float(
