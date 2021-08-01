@@ -1,9 +1,9 @@
 import pathlib
-import os
 
 from mopidy import config, ext
 
 __version__ = '1.1.0'
+
 
 class Extension(ext.Extension):
     dist_name = 'Mopidy-Touchscreen'
@@ -12,7 +12,6 @@ class Extension(ext.Extension):
 
     def get_default_config(self):
         return config.read(pathlib.Path(__file__).parent / "ext.conf")
-
 
     def get_config_schema(self):
         schema = super(Extension, self).get_config_schema()
@@ -37,5 +36,3 @@ class Extension(ext.Extension):
     def setup(self, registry):
         from .touch_screen import TouchScreen
         registry.add('frontend', TouchScreen)
-
-

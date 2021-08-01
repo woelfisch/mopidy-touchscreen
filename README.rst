@@ -28,8 +28,10 @@ applied as well, see below. But it still looks the same:
 Extension for displaying track info and controlling Mopidy from a touch screen
 using `PyGame <http://www.pygame.org/>`_/SDL.
 
-Cover images are downloaded from `last.fm <http://www.last.fm/api>`_ Probably.
-
+Album Cover images are downloaded from the Cover Art Archive
+`<https://coverartarchive.org/>`_ with the help of MusicBrainz
+`<https://musicbrainz.org/>`_ and the musicbrainzngs module
+`<https://python-musicbrainzngs.readthedocs.io/en/v0.7.1/>`_
 
 Dependencies
 ============
@@ -37,6 +39,7 @@ Dependencies
 - ``Mopidy`` >= 3.2
 - ``Pykka`` >= 1.1
 - ``pygame``
+- ``musicbrainzngs`` >= 0.7.1
 
 
 Installation
@@ -192,6 +195,12 @@ Authors
 
 Changelog
 =========
+
+2021-08-01 (woelfisch fork)
+----------------------------
+
+- last.fm cover art service has been dead for how long? Use MusicBrainz.
+- Code cleanup
 
 v1.1.0 (2021-07-29, woelfisch fork)
 -----------------------------------

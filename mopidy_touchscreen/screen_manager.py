@@ -1,18 +1,15 @@
 import logging
-import random
-import traceback
-import pygame
-import mopidy
 import os
+import traceback
 from enum import Enum
 
+import mopidy.core
+import pygame
 from pkg_resources import Requirement, resource_filename
-
-from .input_manager import InputManager
 
 from .graphic_utils import DynamicBackground, \
     ScreenObjectsManager, TouchAndTextItem
-
+from .input_manager import InputManager
 from .screens import BaseScreen, Keyboard, LibraryScreen, MainScreen, \
     MenuScreen, PlaylistScreen, SearchScreen, Tracklist
 
@@ -20,15 +17,16 @@ logger = logging.getLogger(__name__)
 
 Screen = Enum('Screen', 'Search Player Tracklist Library Playlists Menu')
 ScreenNames = {
-        'search': Screen.Search,
-        'player': Screen.Player,
-        'tracklist': Screen.Tracklist,
-        'library': Screen.Library,
-        'playlists': Screen.Playlists,
-        'menu': Screen.Menu,
-        }
+    'search': Screen.Search,
+    'player': Screen.Player,
+    'tracklist': Screen.Tracklist,
+    'library': Screen.Library,
+    'playlists': Screen.Playlists,
+    'menu': Screen.Menu,
+}
 
-class ScreenManager():
+
+class ScreenManager:
     def __init__(self, size, core, cache, resolution_factor, start_screen=Screen.Library, main_screen=None):
         self.core = core
         self.cache = cache
@@ -51,6 +49,7 @@ class ScreenManager():
         self.update_type = BaseScreen.update_all
 
         self.inactivity_timer_count = 0
+        self.inactivity_timer = 0
         self.frame_count = 0
 
         self.resolution_factor = resolution_factor
@@ -71,8 +70,8 @@ class ScreenManager():
         font_base = resource_filename(
             Requirement.parse("mopidy-touchscreen"),
             "mopidy_touchscreen/NotoSans-Regular.ttf")
-        self.fonts['base'] = pygame.font.Font(font_base, int(self.base_size*0.9))
-        self.fonts['icon'] = pygame.font.Font(font_icon, int(self.base_size*0.9))
+        self.fonts['base'] = pygame.font.Font(font_base, int(self.base_size * 0.9))
+        self.fonts['icon'] = pygame.font.Font(font_icon, int(self.base_size * 0.9))
 
         self.track = None
 
@@ -84,12 +83,11 @@ class ScreenManager():
 
         x = 0
         i = 0
-        while(i<6):
-
+        while i < 6:
             button = TouchAndTextItem(self.fonts['icon'], menu_icons[i],
-                                    (x, self.size[1] - self.base_size),
-                                    button_size, center=True)
-            self.down_bar_objects.set_touch_object("menu_" + Screen(i+1).name, button)
+                                      (x, self.size[1] - self.base_size),
+                                      button_size, center=True)
+            self.down_bar_objects.set_touch_object("menu_" + Screen(i + 1).name, button)
             x = button.get_right_pos()
             i += 1
             button.pos = (button.pos[0], self.size[1] - button.rect_in_pos.size[1])
@@ -104,15 +102,15 @@ class ScreenManager():
 
         try:
             self.screens = {
-                    Screen.Search: SearchScreen(screen_size, self.base_size, self, self.fonts),
-                    Screen.Player: MainScreen(screen_size, self.base_size, self, self.fonts,
-                           self.cache, self.core, self.background),
-                    Screen.Tracklist: Tracklist(screen_size, self.base_size, self, self.fonts),
-                    Screen.Library: LibraryScreen(screen_size, self.base_size, self, self.fonts),
-                    Screen.Playlists: PlaylistScreen(screen_size,
-                               self.base_size, self, self.fonts),
-                    Screen.Menu: MenuScreen(screen_size, self.base_size, self, self.fonts, self.core)
-                    }
+                Screen.Search: SearchScreen(screen_size, self.base_size, self, self.fonts),
+                Screen.Player: MainScreen(screen_size, self.base_size, self, self.fonts,
+                                          self.cache, self.core, self.background),
+                Screen.Tracklist: Tracklist(screen_size, self.base_size, self, self.fonts),
+                Screen.Library: LibraryScreen(screen_size, self.base_size, self, self.fonts),
+                Screen.Playlists: PlaylistScreen(screen_size,
+                                                 self.base_size, self, self.fonts),
+                Screen.Menu: MenuScreen(screen_size, self.base_size, self, self.fonts, self.core)
+            }
         except:
             traceback.print_exc()
 
@@ -143,7 +141,6 @@ class ScreenManager():
                     else:
                         return BaseScreen.no_update
 
-
     def set_inactivity_timeout(self, timeout):
         self.inactivity_timer = timeout
 
@@ -167,13 +164,12 @@ class ScreenManager():
 
         return True
 
-
     def update(self, screen):
-        if self.main_screen is not None and  \
+        if self.main_screen is not None and \
                 self.current_screen != self.main_screen and \
                 self.inactivity_timeout():
             self.change_screen(self.main_screen)
-            
+
         update_type = self.get_update_type()
         if update_type != BaseScreen.no_update:
             rects = []
@@ -185,9 +181,9 @@ class ScreenManager():
                 surface = self.background.draw_background()
 
             if self.keyboard:
-                self.keyboard.update(surface)
+                self.keyboard.update(surface, update_type, rects)
             else:
-                self.screens[self.current_screen].\
+                self.screens[self.current_screen]. \
                     update(surface, update_type, rects)
                 surface.blit(self.down_bar, (0, self.size[1] - self.down_bar.get_size()[1]))
                 self.down_bar_objects.render(surface)
@@ -228,11 +224,11 @@ class ScreenManager():
             return self.click_on_objects(objects, event)
         else:
             if event.type == InputManager.key and not event.longpress:
-                dir = event.direction
-                if dir == InputManager.right or dir == InputManager.left:
-                    if not self.screens[self.current_screen].change_screen(dir):
+                direction = event.direction
+                if direction == InputManager.right or direction == InputManager.left:
+                    if not self.screens[self.current_screen].change_screen(direction):
                         cur = self.current_screen.value
-                        if dir == InputManager.right:
+                        if direction == InputManager.right:
                             cur += 1
                         else:
                             cur -= 1
@@ -282,7 +278,7 @@ class ScreenManager():
                     elif event.unicode == 'q':
                         if os.system("gksu -- shutdown now -h") != 0:
                             os.system("sudo shutdown now -h")
-                    elif event.unicode >= "1" and event.unicode <= str(len(Screen)):
+                    elif "1" <= event.unicode <= str(len(Screen)):
                         self.change_screen(Screen(int(event.unicode)))
 
             return False
@@ -310,8 +306,8 @@ class ScreenManager():
 
     def change_screen(self, new_screen):
         logger.info(f'switching to screen "{new_screen.name}"')
-        self.down_bar_objects.get_touch_object('menu_'+self.current_screen.name).set_active(False)
-        self.down_bar_objects.get_touch_object('menu_'+new_screen.name).set_active(True)
+        self.down_bar_objects.get_touch_object('menu_' + self.current_screen.name).set_active(False)
+        self.down_bar_objects.get_touch_object('menu_' + new_screen.name).set_active(True)
         self.current_screen = new_screen
         self.update_type = BaseScreen.update_all
 

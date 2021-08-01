@@ -6,7 +6,8 @@ import json
 import logging
 import os
 import time
-import urllib
+import urllib.request
+import urllib.parse
 from threading import Thread
 from enum import Enum
 import socket
@@ -19,8 +20,19 @@ from .input_manager import InputManager
 
 logger = logging.getLogger(__name__)
 
-class BaseScreen():
+try:
+    import musicbrainzngs
+    _use_musicbrainz = True
+    musicbrainzngs.set_useragent(
+        "mopidy-touchtft",
+        "1.1.0"
+        "https://github.com/woelfisch/mopidy-touchscreen"
+    )
+except:
+    _use_musicbrainz = False
+    logger.info('Module usicbrainz-ngs not found. Will not download cover art.')
 
+class BaseScreen:
     update_all = 0
     update_partial = 1
     no_update = 2
@@ -53,18 +65,19 @@ class BaseScreen():
     def should_update(self):
         return BaseScreen.update_partial
 
+
 class Keyboard(BaseScreen):
 
     def __init__(self, size, base_size, manager, fonts, listener):
         BaseScreen.__init__(self, size, base_size, manager, fonts)
-        self.base_width = size[0]/10
-        self.base_height = size[1]/5
+        self.base_width = size[0] / 10
+        self.base_height = size[1] / 5
         self.listener = listener
         self.manager = manager
         self.selected_row = 0
         self.selected_col = 0
         self.selected_others = -1
-        self.font = pygame.font.SysFont("arial", int(size[1]/7))
+        self.font = pygame.font.SysFont("arial", int(size[1] / 7))
         self.keyboards = [ScreenObjectsManager(), ScreenObjectsManager()]
         self.other_objects = ScreenObjectsManager()
         self.current_keyboard = 0
@@ -86,7 +99,7 @@ class Keyboard(BaseScreen):
                                      (pos, line),
                                      (self.base_width, self.base_height),
                                      center=True, background=(150, 150, 150))
-                self.keyboards[self.current_keyboard].\
+                self.keyboards[self.current_keyboard]. \
                     set_touch_object(key, button)
                 pos += self.base_width
             line += self.base_height
@@ -101,7 +114,7 @@ class Keyboard(BaseScreen):
                                      (self.base_width, self.base_height),
                                      center=True, background=(150, 150, 150),
                                      scroll_no_fit=False)
-                self.keyboards[self.current_keyboard].\
+                self.keyboards[self.current_keyboard]. \
                     set_touch_object(key, button)
                 pos += self.base_width
             line += self.base_height
@@ -109,32 +122,32 @@ class Keyboard(BaseScreen):
 
         # Symbol button
         button = TouchAndTextItem(self.font, "123",
-                                  (0, self.base_height*4),
-                                  (self.base_width*2, self.base_height),
+                                  (0, self.base_height * 4),
+                                  (self.base_width * 2, self.base_height),
                                   center=True, background=(150, 150, 150),
                                   scroll_no_fit=False)
         self.other_objects.set_touch_object("symbols", button)
 
         # remove button
         button = TouchAndTextItem(self.font, "<-",
-                                  (self.base_width*2, self.base_height*4),
-                                  (self.base_width*2, self.base_height),
+                                  (self.base_width * 2, self.base_height * 4),
+                                  (self.base_width * 2, self.base_height),
                                   center=True, background=(150, 150, 150),
                                   scroll_no_fit=False)
         self.other_objects.set_touch_object("remove", button)
 
         # Space button
         button = TouchAndTextItem(self.font, " ",
-                                  (self.base_width*4, self.base_height*4),
-                                  (self.base_width*4, self.base_height),
+                                  (self.base_width * 4, self.base_height * 4),
+                                  (self.base_width * 4, self.base_height),
                                   center=True, background=(150, 150, 150),
                                   scroll_no_fit=False)
         self.other_objects.set_touch_object("space", button)
 
         # OK button
         button = TouchAndTextItem(self.font, "->",
-                                  (self.base_width*8, self.base_height*4),
-                                  (self.base_width*2, self.base_height),
+                                  (self.base_width * 8, self.base_height * 4),
+                                  (self.base_width * 2, self.base_height),
                                   center=True, background=(150, 150, 150),
                                   scroll_no_fit=False)
         self.other_objects.set_touch_object("ok", button)
@@ -148,14 +161,14 @@ class Keyboard(BaseScreen):
         self.selected_others = 3
         self.set_selected_other()
 
-    def update(self, screen):
+    def update(self, screen, update_type, rects):
         screen.fill((0, 0, 0))
         self.keyboards[self.current_keyboard].render(screen)
         self.other_objects.render(screen)
 
     def touch_event(self, touch_event):
         if touch_event.type == InputManager.click:
-            keys = self.keyboards[self.current_keyboard]\
+            keys = self.keyboards[self.current_keyboard] \
                 .get_touch_objects_in_pos(touch_event.current_pos)
             for key in keys:
                 self.other_objects.get_object("text").add_text(key, False)
@@ -301,7 +314,6 @@ class Keyboard(BaseScreen):
         self.other_objects.set_selected(key)
 
 
-
 class LibraryScreen(BaseScreen):
     def __init__(self, size, base_size, manager, fonts):
         BaseScreen.__init__(self, size, base_size, manager, fonts)
@@ -349,9 +361,9 @@ class LibraryScreen(BaseScreen):
                 if clicked == 0:
                     self.go_up_directory()
                 else:
-                    if self.library[clicked - 1].type\
+                    if self.library[clicked - 1].type \
                             == mopidy.models.Ref.TRACK:
-                        self.play_uri(clicked-1)
+                        self.play_uri(clicked - 1)
                     else:
                         self.go_inside_directory(
                             self.library[clicked - 1].uri)
@@ -422,8 +434,6 @@ class MainScreen(BaseScreen):
         progress.set_value(self.core.mixer.get_volume().get())
         self.progress_show = False
 
-
-
     def should_update(self):
         if len(self.update_keys) > 0:
             if self.update_progress():
@@ -441,12 +451,11 @@ class MainScreen(BaseScreen):
 
     def find_update_rects(self, rects):
         for key in self.update_keys:
-            object = self.touch_text_manager.get_object(key)
-            rects.append(object.rect_in_pos)
-        if self.progress_show and self.has_to_update_progress :
-            object = self.touch_text_manager.get_touch_object("time_progress")
-            print(object.rect_in_pos)
-            rects.append(object.rect_in_pos)
+            item = self.touch_text_manager.get_object(key)
+            rects.append(item.rect_in_pos)
+        if self.progress_show and self.has_to_update_progress:
+            item = self.touch_text_manager.get_touch_object("time_progress")
+            rects.append(item.rect_in_pos)
 
     def update(self, screen, update_type, rects):
         if update_type == BaseScreen.update_all:
@@ -467,24 +476,24 @@ class MainScreen(BaseScreen):
                     "time_progress").render(screen)
                 self.has_to_update_progress = False
             for key in self.update_keys:
-                object = self.touch_text_manager.get_object(key)
-                object.update()
-                object.render(screen)
+                item = self.touch_text_manager.get_object(key)
+                item.update()
+                item.render(screen)
 
     def update_progress(self):
         if self.progress_show:
-                track_pos_millis = self.core.playback.get_time_position().get()
-                new_track_pos = track_pos_millis / 1000
+            track_pos_millis = self.core.playback.get_time_position().get()
+            new_track_pos = track_pos_millis / 1000
 
-                if new_track_pos != self.current_track_pos:
-                    progress = self.touch_text_manager.get_touch_object("time_progress")
-                    progress.set_value(track_pos_millis)
-                    self.current_track_pos = new_track_pos
-                    progress.set_text(
-                        time.strftime('%M:%S', time.gmtime(
-                            self.current_track_pos)) +
-                        "/" + self.track_duration)
-                    return True
+            if new_track_pos != self.current_track_pos:
+                progress = self.touch_text_manager.get_touch_object("time_progress")
+                progress.set_value(track_pos_millis)
+                self.current_track_pos = new_track_pos
+                progress.set_text(
+                    time.strftime('%M:%S', time.gmtime(
+                        self.current_track_pos)) +
+                    "/" + self.track_duration)
+                return True
         return False
 
     def track_started(self, track):
@@ -514,11 +523,11 @@ class MainScreen(BaseScreen):
             progress = Progressbar(self.fonts['base'],
                                    time.strftime('%M:%S', time.gmtime(
                                        0)) + "/" + time.strftime(
-                                   '%M:%S', time.gmtime(0)),
+                                       '%M:%S', time.gmtime(0)),
                                    (size_1, self.size[1] - self.base_size),
                                    (
-                                   self.size[0] - size_1 - size_2,
-                                   self.base_size),
+                                       self.size[0] - size_1 - size_2,
+                                       self.base_size),
                                    track.length, False)
             self.touch_text_manager.set_touch_object("time_progress",
                                                      progress)
@@ -535,8 +544,8 @@ class MainScreen(BaseScreen):
         # Track name
         label = TextItem(self.fonts['base'],
                          MainScreen.get_track_name(track),
-                         (x, (self.size[1]-self.base_size*3)/2
-                          - self.base_size*0.5),
+                         (x, (self.size[1] - self.base_size * 3) / 2
+                          - self.base_size * 0.5),
                          (width, -1))
         if not label.fit_horizontal:
             self.update_keys.append("track_name")
@@ -546,8 +555,8 @@ class MainScreen(BaseScreen):
         label = TextItem(self.fonts['base'],
                          MainScreen.get_track_album_name
                          (track),
-                         (x, (self.size[1]-self.base_size*3)/2
-                          + self.base_size*0.5),
+                         (x, (self.size[1] - self.base_size * 3) / 2
+                          + self.base_size * 0.5),
                          (width, -1))
         if not label.fit_horizontal:
             self.update_keys.append("album_name")
@@ -556,8 +565,8 @@ class MainScreen(BaseScreen):
         # Artist
         label = TextItem(self.fonts['base'],
                          self.get_artist_string(),
-                         (x, (self.size[1]-self.base_size*3)/2
-                          + self.base_size*1.5),
+                         (x, (self.size[1] - self.base_size * 3) / 2
+                          + self.base_size * 1.5),
                          (width, -1))
         if not label.fit_horizontal:
             self.update_keys.append("artist_name")
@@ -604,37 +613,43 @@ class MainScreen(BaseScreen):
         image_uris = self.core.library.get_images(
             {self.track.uri}).get()[self.track.uri]
         if len(image_uris) > 0:
-            urllib.urlretrieve(image_uris[0].uri,
+            urllib.request.urlretrieve(image_uris[0].uri,
                                self.get_cover_folder() +
                                self.get_image_file_name())
             self.load_image()
         else:
-            self.download_image_last_fm(0)
+            self.download_image_musicbrainz(0)
 
-    def download_image_last_fm(self, artist_index):
-        if artist_index < len(self.artists):
-            try:
-                safe_artist = urllib.quote_plus(
-                    self.artists[artist_index].name)
-                safe_album = urllib.quote_plus(
-                    MainScreen.get_track_album_name(self.track))
-                url = "http://ws.audioscrobbler.com/2.0/?"
-                params = "method=album.getinfo&" + \
-                         "api_key=59a04c6a73fb99d6e8996e01db306829&" \
-                         + "artist=" \
-                         + safe_artist + "&album=" + safe_album + \
-                         "&format=json"
-                response = urllib.urlopen(url + params)
-                data = json.load(response)
-                image = data['album']['image'][-1]['#text']
-                urllib.urlretrieve(image,
-                                   self.get_cover_folder() +
-                                   self.get_image_file_name())
-                self.load_image()
-            except:
-                self.download_image_last_fm(artist_index + 1)
-        else:
+    def download_image_musicbrainz(self, artist_index):
+        found = False
+        while _use_musicbrainz and not found and artist_index < len(self.artists):
+            result = musicbrainzngs.search_releases(artist = self.artists[artist_index].name,
+                                                        release = MainScreen.get_track_album_name(self.track),
+                                                       limit = 5)
 
+            releases = result.get('release-list')
+            if  releases is None or len(releases) < 1:
+                logger.info('Artist/Album combination not found on Musicbrainz')
+                artist_index += 1
+                continue
+
+            for release in releases:
+                mbid = release.get("id")
+                if mbid is None:
+                    logger.info('MusicBranz error: no MBID')
+                    continue
+
+                try:
+                    image = musicbrainzngs.get_image_front(mbid, size="500")
+                    with open(self.get_cover_folder() + self.get_image_file_name(), "wb") as fp:
+                        fp.write(image)
+                    self.load_image()
+                    found = True
+                    break
+                except:
+                    logger.info(f'Cover art for {mbid} not found')
+
+        if not found:
             logger.info("Cover could not be downloaded")
 
             # There is no cover
@@ -698,7 +713,7 @@ class MainScreen(BaseScreen):
         self.touch_text_manager.set_object("artist_name", current)
 
     def load_image(self):
-        size = self.size[1] - self.base_size * 3
+        size = int(self.size[1] - self.base_size * 3)
         image_original = pygame.image.load(
             self.get_cover_folder() +
             self.get_image_file_name())
@@ -708,7 +723,7 @@ class MainScreen(BaseScreen):
         self.background.set_background_image(image_original)
 
     def touch_event(self, event):
-        if event.type == InputManager.click:
+        if event.type == InputManager.click or event.type == InputManager.long_click:
             objects = \
                 self.touch_text_manager.get_touch_objects_in_pos(
                     event.current_pos)
@@ -759,7 +774,6 @@ class MainScreen(BaseScreen):
                         key).get_pos_value(
                         event.current_pos)
                     self.core.playback.seek(value)
-
                 elif key == "previous":
                     self.core.playback.previous()
                 elif key == "next":
@@ -767,17 +781,19 @@ class MainScreen(BaseScreen):
                 elif key == "volume":
                     self.change_volume(event)
                 elif key == "pause_play":
-                    playback_state = self.core.playback.get_state() 
-                    if playback_state == mopidy.core.PlaybackState.PLAYING:
-                        if event.longpress:              # FIXME: needs testing
+                    playback_state = self.core.playback.get_state().get()
+                    if event.type == InputManager.long_click:
+                        if playback_state != mopidy.core.PlaybackState.STOPPED:
                             self.core.playback.stop()
                         else:
+                            self.core.playback.play()
+                    else:
+                        if playback_state == mopidy.core.PlaybackState.PLAYING:
                             self.core.playback.pause()
-                    elif playback_state == mopidy.core.PlaybackState.PAUSED:
-                        self.core.playback.resume()
-                    elif playback_state == mopidy.core.PlaybackState.STOPPED:
-                         self.core.playback.play()
-                      
+                        elif playback_state == mopidy.core.PlaybackState.PAUSED:
+                            self.core.playback.resume()
+                        elif playback_state == mopidy.core.PlaybackState.STOPPED:
+                            self.core.playback.play()
                 elif key == "mute":
                     mute = not self.core.mixer.get_mute().get()
                     self.core.mixer.set_mute(mute)
@@ -793,13 +809,13 @@ class MainScreen(BaseScreen):
     def playback_state_changed(self, old_state, new_state):
         if new_state == mopidy.core.PlaybackState.PLAYING:
             self.touch_text_manager.get_touch_object(
-                "pause_play").set_text(u"\ue615", False)   # |>
+                "pause_play").set_text(u"\ue615", False)  # |>
         elif new_state == mopidy.core.PlaybackState.PAUSED:
             self.touch_text_manager.get_touch_object(
-                "pause_play").set_text(u"\ue616", False)   # ||
+                "pause_play").set_text(u"\ue616", False)  # ||
         elif new_state == mopidy.core.PlaybackState.STOPPED:
             self.touch_text_manager.get_touch_object(
-                "pause_play").set_text(u"\ue617", False)   # []
+                "pause_play").set_text(u"\ue617", False)  # []
 
     def volume_changed(self, volume):
         if not self.core.mixer.get_mute().get():
@@ -846,32 +862,32 @@ class MainScreen(BaseScreen):
         else:
             return "Unknow Album"
 
+
 class MenuScreen(BaseScreen):
     def __init__(self, size, base_size, manager, fonts, core):
         BaseScreen.__init__(self, size, base_size, manager, fonts)
         self.ip = None
         self.core = core
-        self.list = ListView((0, 0), size,
-                             base_size, fonts['base'])
+        self.list_view = ListView((0, 0), size,
+                                  base_size, fonts['base'])
 
         self.list_items = ["Random", "Repeat", "Single", "Consume",
                            "Exit Mopidy", "Shutdown", "Restart", "IP: "]
 
-        self.list.set_list(self.list_items)
+        self.list_view.set_list(self.list_items)
 
     def should_update(self):
-        return self.list.should_update()
+        return self.list_view.should_update()
 
     def find_update_rects(self, rects):
         return self.list_view.find_update_rects(rects)
 
-
     def update(self, screen, update_type, rects):
         update_all = (update_type == BaseScreen.update_all)
-        self.list.render(screen, update_all, rects)
+        self.list_view.render(screen, update_all, rects)
 
     def touch_event(self, event):
-        clicked = self.list.touch_event(event)
+        clicked = self.list_view.touch_event(event)
         if clicked is not None:
             if clicked == 0:
                 random = not self.core.tracklist.get_random().get()
@@ -898,18 +914,20 @@ class MenuScreen(BaseScreen):
 
     # Will check internet connection
     def check_connection(self):
+        s = None
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.connect(("8.8.8.8", 80))
             self.ip = s.getsockname()[0]
             s.close()
             self.list_items[7] = "IP: " + self.ip
-            self.list.set_list(self.list_items)
+            self.list_view.set_list(self.list_items)
         except socket.error:
-            s.close()
+            if s is not None:
+                s.close()
             self.ip = None
             self.list_items[7] = "IP: No internet"
-            self.list.set_list(self.list_items)
+            self.list_view.set_list(self.list_items)
 
     def options_changed(self):
         active = []
@@ -921,24 +939,13 @@ class MenuScreen(BaseScreen):
             active.append(2)
         if self.core.tracklist.get_consume().get():
             active.append(3)
-        self.list.set_active(active)
-
-    def set_connection(self, connection, loading):
-        internet = self.touch_text_manager.get_touch_object(
-            "internet")
-        if loading:
-            internet.set_text(u"\ue627", None)
-            internet.set_active(False)
-        else:
-            internet.set_text(u"\ue602", None)
-            internet.set_active(connection)
-
+        self.list_view.set_active(active)
 
 class PlaylistScreen(BaseScreen):
     def __init__(self, size, base_size, manager, fonts):
         BaseScreen.__init__(self, size, base_size, manager, fonts)
         self.list_view = ListView((0, 0), size, self.base_size,
-            self.fonts['base'])
+                                  self.fonts['base'])
         self.playlists_strings = []
         self.playlists = []
         self.selected_playlist = None
@@ -952,7 +959,6 @@ class PlaylistScreen(BaseScreen):
 
     def find_update_rects(self, rects):
         return self.list_view.find_update_rects(rects)
-
 
     def update(self, screen, update_type, rects):
         update_all = (update_type == BaseScreen.update_all)
@@ -998,18 +1004,20 @@ class PlaylistScreen(BaseScreen):
                     # the tracklist for streams that don't have track meta data?
                     # self.manager.core.tracklist.add(uris=self.playlist_uris)
                     self.manager.core.tracklist.add(tracks=self.playlist_tracks)
-                    self.manager.core.playback.play(tl_track=self.manager.core.tracklist.get_tl_tracks().get()[clicked-1])
+                    self.manager.core.playback.play(
+                        tl_track=self.manager.core.tracklist.get_tl_tracks().get()[clicked - 1])
                     # self.manager.change_screen(self.manager.screen_type.Player)
 
 
 SearchMode = Enum('SearchMode', 'Track Album Artist')
 
+
 class SearchScreen(BaseScreen):
     def __init__(self, size, base_size, manager, fonts):
         BaseScreen.__init__(self, size, base_size, manager, fonts)
-        self.list_view = ListView((0, self.base_size*2), (
+        self.list_view = ListView((0, self.base_size * 2), (
             self.size[0], self.size[1] -
-            2*self.base_size), self.base_size, manager.fonts['base'])
+            2 * self.base_size), self.base_size, manager.fonts['base'])
         self.results_strings = []
         self.results = []
         self.screen_objects = ScreenObjectsManager()
@@ -1030,12 +1038,12 @@ class SearchScreen(BaseScreen):
         self.screen_objects.set_touch_object("query", text)
 
         # Mode buttons
-        button_size = ((self.size[0]-x)/3, self.base_size)
+        button_size = ((self.size[0] - x) / 3, self.base_size)
         self.mode_objects_keys = {
-                SearchMode.Track: "mode_track",
-                SearchMode.Album: "mode_album",
-                SearchMode.Artist: "mode_artist"
-                }
+            SearchMode.Track: "mode_track",
+            SearchMode.Album: "mode_album",
+            SearchMode.Artist: "mode_artist"
+        }
 
         # Track button
         button = TouchAndTextItem(self.fonts['base'], "Track",
@@ -1047,14 +1055,14 @@ class SearchScreen(BaseScreen):
 
         # Album button
         button = TouchAndTextItem(self.fonts['base'], "Album",
-                                  (button_size[0]+x, self.base_size),
+                                  (button_size[0] + x, self.base_size),
                                   button_size, center=True)
         self.screen_objects.set_touch_object(
             self.mode_objects_keys[SearchMode.Album], button)
 
         # Artist button
         button = TouchAndTextItem(self.fonts['base'], "Artist",
-                                  (button_size[0]*2+x, self.base_size),
+                                  (button_size[0] * 2 + x, self.base_size),
                                   button_size, center=True)
         self.screen_objects.set_touch_object(
             self.mode_objects_keys[SearchMode.Artist], button)
@@ -1074,7 +1082,6 @@ class SearchScreen(BaseScreen):
     def find_update_rects(self, rects):
         return self.list_view.find_update_rects(rects)
 
-
     def update(self, screen, update_type, rects):
         screen.blit(self.top_bar, (0, 0))
         self.screen_objects.render(screen)
@@ -1084,7 +1091,7 @@ class SearchScreen(BaseScreen):
     def set_mode(self, mode=SearchMode.Track):
         if mode is not self.mode:
             self.mode = mode
-            for val in self.mode_objects_keys.values(): 
+            for val in self.mode_objects_keys.values():
                 self.screen_objects.get_touch_object(val).set_active(False)
             self.screen_objects.get_touch_object(self.mode_objects_keys[self.mode]).set_active(True)
             self.search(self.query, self.mode)
@@ -1116,7 +1123,7 @@ class SearchScreen(BaseScreen):
                     logger.info(f'results for tracks: {iterable}')
                 elif mode == SearchMode.Album:
                     iterable = backend.albums
-                    logger.info(f'results for albmus: {iterable}')
+                    logger.info(f'results for albums: {iterable}')
                 else:
                     iterable = backend.artists
                     logger.info(f'results for artists: {iterable}')
@@ -1155,11 +1162,11 @@ class SearchScreen(BaseScreen):
         mode = self.mode.value
         if direction == InputManager.right:
             if mode < SearchMode.Artist.value:
-                self.set_mode(SearchMode(mode+1))
+                self.set_mode(SearchMode(mode + 1))
                 return True
         elif direction == InputManager.left:
             if mode > SearchMode.Track.value:
-                self.set_mode(SearchMode(mode-1))
+                self.set_mode(SearchMode(mode - 1))
                 return True
             else:
                 self.manager.open_keyboard(self)
@@ -1187,7 +1194,6 @@ class Tracklist(BaseScreen):
     def find_update_rects(self, rects):
         return self.list_view.find_update_rects(rects)
 
-
     def update(self, screen, update_type, rects):
         update_all = (update_type == BaseScreen.update_all)
         self.list_view.render(screen, update_all, rects)
@@ -1213,4 +1219,3 @@ class Tracklist(BaseScreen):
     def track_started(self, track):
         tlindex = self.manager.core.tracklist.index(track).get()
         self.list_view.set_active([tlindex])
-

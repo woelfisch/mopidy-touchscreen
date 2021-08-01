@@ -2,18 +2,15 @@ import logging
 import os
 import traceback
 from threading import Thread
-import syslog
-
-from mopidy import core, exceptions
 
 import pygame
-
 import pykka
+from mopidy import core, exceptions
 
 from .screen_manager import ScreenManager, Screen, ScreenNames
 
-
 logger = logging.getLogger(__name__)
+
 
 class TouchScreen(pykka.ThreadingActor, core.CoreListener):
     def __init__(self, config, core):
@@ -21,6 +18,8 @@ class TouchScreen(pykka.ThreadingActor, core.CoreListener):
         logger.info("Instantiated TouchScreen")
         self.core = core
         self.running = False
+        self.display = None
+        self.screen = None
 
         cfg = config['touchscreen']
         self.cursor = cfg.get('cursor')
@@ -37,7 +36,7 @@ class TouchScreen(pykka.ThreadingActor, core.CoreListener):
 
         # None means: do not switch screens after inactivity
         self.main_screen = ScreenNames.get(cfg.get('main_screen'))
-        self.inactivity_timeout = 20    # seconds
+        self.inactivity_timeout = 20  # seconds
 
         if self.fbdev.lower() != "none":
             os.environ["SDL_FBDEV"] = self.fbdev
@@ -70,7 +69,6 @@ class TouchScreen(pykka.ThreadingActor, core.CoreListener):
             self.evdev_manager = EvDevManager()
             self.evdev_manager.run()
 
-
     # https://stackoverflow.com/questions/54778105/python-pygame-fails-to-output-to-dev-fb1-on-a-raspberry-pi-tft-screen
     # We have to initialize SDL in any case — otherwise Surface.convert*() will fail, 
     # since those functions check SDL_WasInit() in C code. This means no monkey 
@@ -93,8 +91,8 @@ class TouchScreen(pykka.ThreadingActor, core.CoreListener):
             self.screen = pygame.Surface(size)
 
     def refresh_display(self):
-        with open(self.fbdev,'wb') as f:
-            f.write(self.screen.convert(16,0).get_buffer())
+        with open(self.fbdev, 'wb') as f:
+            f.write(self.screen.convert(16, 0).get_buffer())
 
     def start_thread(self):
         clock = pygame.time.Clock()

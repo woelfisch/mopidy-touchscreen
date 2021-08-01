@@ -6,7 +6,7 @@ import pygame
 logger = logging.getLogger(__name__)
 
 
-class InputManager():
+class InputManager:
     click = 1
     swipe = 2
     long_click = 3

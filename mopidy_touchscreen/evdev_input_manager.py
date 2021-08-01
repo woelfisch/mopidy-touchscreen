@@ -6,42 +6,44 @@ import selectors
 import pygame
 import threading
 
-
 logger = logging.getLogger(__name__)
 
-class EvDevManager():
+
+class EvDevManager:
     keycodes = {
-        ec.KEY_LEFT:       (pygame.K_LEFT, None),
-        ec.KEY_RIGHT:      (pygame.K_RIGHT, None),
-        ec.KEY_UP:         (pygame.K_UP, None),
-        ec.KEY_DOWN:       (pygame.K_DOWN, None),
-        ec.KEY_SPACE:      (pygame.K_RETURN, None),
-        ec.KEY_ENTER:      (pygame.K_RETURN, None),
-        ec.KEY_OK:         (pygame.K_RETURN, None),
+        ec.KEY_LEFT: (pygame.K_LEFT, None),
+        ec.KEY_RIGHT: (pygame.K_RIGHT, None),
+        ec.KEY_UP: (pygame.K_UP, None),
+        ec.KEY_DOWN: (pygame.K_DOWN, None),
+        ec.KEY_SPACE: (pygame.K_RETURN, None),
+        ec.KEY_ENTER: (pygame.K_RETURN, None),
+        ec.KEY_OK: (pygame.K_RETURN, None),
         ec.KEY_VOLUMEDOWN: (pygame.K_MINUS, '-'),
-        ec.KEY_VOLUMEUP:   (pygame.K_PLUS, '+'),
-        ec.KEY_1:          (pygame.K_1, '1'),
-        ec.KEY_2:          (pygame.K_2, '2'),
-        ec.KEY_3:          (pygame.K_3, '3'),
-        ec.KEY_4:          (pygame.K_4, '4'),
-        ec.KEY_5:          (pygame.K_5, '5'),
-        ec.KEY_6:          (pygame.K_6, '6'),
-        ec.KEY_PREVIOUS:   (pygame.K_PAGEUP, 'p'),
-        ec.KEY_NEXT:       (pygame.K_PAGEDOWN, 'n'),
-        ec.KEY_PLAYPAUSE:  (pygame.K_PAUSE, ' '),
-        ec.KEY_STOP:       (pygame.K_x, 'x'),
-        ec.KEY_AGAIN:      (pygame.K_r, 'r'),
-        ec.KEY_SHUFFLE:    (pygame.K_s, 's'),
-        ec.KEY_MUTE:       (pygame.K_m, 'm'),
-        ec.KEY_AB:         (pygame.K_o, 'o'), # single track mode
-        ec.KEY_POWER:      (pygame.K_POWER, 'q'),
+        ec.KEY_VOLUMEUP: (pygame.K_PLUS, '+'),
+        ec.KEY_1: (pygame.K_1, '1'),
+        ec.KEY_2: (pygame.K_2, '2'),
+        ec.KEY_3: (pygame.K_3, '3'),
+        ec.KEY_4: (pygame.K_4, '4'),
+        ec.KEY_5: (pygame.K_5, '5'),
+        ec.KEY_6: (pygame.K_6, '6'),
+        ec.KEY_PREVIOUS: (pygame.K_PAGEUP, 'p'),
+        ec.KEY_NEXT: (pygame.K_PAGEDOWN, 'n'),
+        ec.KEY_PLAYPAUSE: (pygame.K_PAUSE, ' '),
+        ec.KEY_STOP: (pygame.K_x, 'x'),
+        ec.KEY_AGAIN: (pygame.K_r, 'r'),
+        ec.KEY_SHUFFLE: (pygame.K_s, 's'),
+        ec.KEY_MUTE: (pygame.K_m, 'm'),
+        ec.KEY_AB: (pygame.K_o, 'o'),  # single track mode
+        ec.KEY_POWER: (pygame.K_POWER, 'q'),
     }
 
     def __init__(self):
+        self.killswitch = False
+        self.thread = None
+        self.button_devices = []
         self.get_devices()
 
     def get_devices(self):
-        self.button_devices = []
         devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
         for device in devices:
             if device.name.startswith("lircd-uinput"):
@@ -97,6 +99,3 @@ class EvDevManager():
 
     def stop(self):
         self.killswitch = True
-
-     
-
