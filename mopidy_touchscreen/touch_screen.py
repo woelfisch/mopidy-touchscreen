@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import traceback
 from threading import Thread
 
@@ -7,10 +8,10 @@ import pygame
 import pykka
 from mopidy import core, exceptions
 
+import mopidy_touchscreen.screens
 from .screen_manager import ScreenManager, Screen, ScreenNames
 
 logger = logging.getLogger(__name__)
-
 
 class TouchScreen(pykka.ThreadingActor, core.CoreListener):
     def __init__(self, config, core):
@@ -18,7 +19,6 @@ class TouchScreen(pykka.ThreadingActor, core.CoreListener):
         logger.info("Instantiated TouchScreen")
         self.core = core
         self.running = False
-        self.display = None
         self.screen = None
 
         cfg = config['touchscreen']
@@ -27,8 +27,6 @@ class TouchScreen(pykka.ThreadingActor, core.CoreListener):
         self.fullscreen = cfg.get('fullscreen')
         self.screen_size = (cfg.get('screen_width'), cfg.get('screen_height'))
         self.resolution_factor = cfg.get('resolution_factor')
-        self.fbdev = cfg.get('fbdev')
-        self.sdl_output = cfg.get('sdl_output')
 
         self.start_screen = ScreenNames.get(cfg.get('start_screen'))
         if self.start_screen is None:
@@ -38,10 +36,10 @@ class TouchScreen(pykka.ThreadingActor, core.CoreListener):
         self.main_screen = ScreenNames.get(cfg.get('main_screen'))
         self.inactivity_timeout = 20  # seconds
 
-        if self.fbdev.lower() != "none":
-            os.environ["SDL_FBDEV"] = self.fbdev
         if cfg.get('sdl_videodriver') != "none":
             os.environ["SDL_VIDEODRIVER"] = cfg.get('sdl_videodriver')
+        if cfg.get('sdl_video_render_driver') != "none":
+            os.environ["SDL_RENDER_DRIVER"] = cfg.get('sdl_video_render_driver')
         if cfg.get('sdl_mousedriver').lower() != "none":
             os.environ["SDL_MOUSEDRV"] = cfg.get('sdl_mousedriver')
         if cfg.get('sdl_mousedev').lower != "none":
@@ -50,10 +48,47 @@ class TouchScreen(pykka.ThreadingActor, core.CoreListener):
             os.environ["SDL_AUDIODRIVER"] = cfg.get('sdl_audiodriver')
         os.environ["SDL_PATH_DSP"] = cfg.get('sdl_path_dsp')
 
+        video_device_idx = cfg.get('sdl_video_device_index')
+        if  video_device_idx == "none":
+            video_device = cfg.get("sdl_video_device")
+            vd_link = ""
+            if video_device != "none":
+                try:
+                    vd_link = os.readlink("/dev/dri/by-path/"+video_device)
+                    match = re.search(r'card([0-9]*)$', vd_link)
+                    if match is None:
+                        raise ValueError
+                    idx = match.group(1)
+                    if idx == "":
+                        raise ValueError
+                    video_device_idx = idx
+                except FileNotFoundError:
+                    logger.error("sdl_video_device '{}' does not exist".format(video_device))
+                except ValueError:
+                    logger.error("sdl_video_device '{}' points to invalid node name '{}'".format(video_device, vd_link))
+
+            if video_device_idx != "none":
+                logger.info('Setting SDL_VIDEO_DEVICE_INDEX to {}'.format(video_device_idx))
+                os.environ["SDL_VIDEO_DEVICE_INDEX"] = video_device_idx
+
+    def get_display_surface(self, size):
+        logger.info("getting display surface of size {}".format(size))
+        try:
+            flags = 0 # pygame.OPENGL
+            if self.fullscreen:
+                flags |= pygame.FULLSCREEN
+            else:
+                flags |= pygame.RESIZABLE
+            self.screen = pygame.display.set_mode(size, flags | pygame.FULLSCREEN)
+        except Exception:
+            raise exceptions.FrontendError("Error on display init:\n" + traceback.format_exc())
+
+    def start_thread(self):
         pygame.init()
         pygame.display.set_caption("Mopidy-Touchscreen")
         self.get_display_surface(self.screen_size)
         pygame.mouse.set_visible(self.cursor)
+
         self.screen_manager = ScreenManager(self.screen_size,
                                             self.core,
                                             self.cache_dir,
@@ -63,46 +98,14 @@ class TouchScreen(pykka.ThreadingActor, core.CoreListener):
 
         self.screen_manager.set_inactivity_timeout(self.inactivity_timeout)
 
-        self.evdev = cfg.get('evdev')
-        if self.evdev:
-            from .evdev_input_manager import EvDevManager
-            self.evdev_manager = EvDevManager()
-            self.evdev_manager.run()
-
-    # https://stackoverflow.com/questions/54778105/python-pygame-fails-to-output-to-dev-fb1-on-a-raspberry-pi-tft-screen
-    # We have to initialize SDL in any case — otherwise Surface.convert*() will fail, 
-    # since those functions check SDL_WasInit() in C code. This means no monkey 
-    # patching either. Hence, SDL will always grab the accalerated framebuffer (ie,
-    # RPi's HDMI output) and you can't really do anything usuful with it, and I
-    # don't know what happens if no monitor is attached to it...
-
-    def get_display_surface(self, size):
-        try:
-            if self.fullscreen:
-                self.display = pygame.display.set_mode(size, pygame.FULLSCREEN)
-            else:
-                self.display = pygame.display.set_mode(size, pygame.RESIZABLE)
-        except Exception:
-            raise exceptions.FrontendError("Error on display init:\n" + traceback.format_exc())
-
-        if self.sdl_output:
-            self.screen = self.display
-        else:
-            self.screen = pygame.Surface(size)
-
-    def refresh_display(self):
-        with open(self.fbdev, 'wb') as f:
-            f.write(self.screen.convert(16, 0).get_buffer())
-
-    def start_thread(self):
+        logger.info("starting event handling loop")
         clock = pygame.time.Clock()
         pygame.event.set_blocked(pygame.MOUSEMOTION)
         while self.running:
             clock.tick(12)
 
-            self.screen_manager.update(self.screen)
-            if not self.sdl_output:
-                self.refresh_display()
+            if self.screen is not None:
+                self.screen_manager.update(self.screen)
 
             for event in pygame.event.get():
                 # logger.info(f"got event {event}")

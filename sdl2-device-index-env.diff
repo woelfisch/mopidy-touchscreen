@@ -1,0 +1,27 @@
+Original version by "substring", https://github.com/libsdl-org/SDL/pull/5276
+Rebased on 6d1c3cd
+
+diff --git a/src/video/SDL_video.c b/src/video/SDL_video.c
+index f2c7b8b23..30a0cec99 100644
+--- a/src/video/SDL_video.c
++++ b/src/video/SDL_video.c
+@@ -393,6 +393,7 @@ SDL_VideoInit(const char *driver_name)
+     SDL_bool init_keyboard = SDL_FALSE;
+     SDL_bool init_mouse = SDL_FALSE;
+     SDL_bool init_touch = SDL_FALSE;
++    const char *env_device_index = SDL_getenv("SDL_VIDEO_DEVICE_INDEX");
+ 
+     /* Check to make sure we don't overwrite '_this' */
+     if (_this != NULL) {
+@@ -427,6 +428,11 @@ SDL_VideoInit(const char *driver_name)
+     if (driver_name == NULL) {
+         driver_name = SDL_getenv("SDL_VIDEODRIVER");
+     }
++    /* Check first if the user specified a card index */
++    if (env_device_index) {
++      /* Will be 0 anyway if the string is not an integer */
++      index = SDL_strtol(env_device_index, NULL, 0);
++    }
+     if (driver_name != NULL && *driver_name != 0) {
+         const char *driver_attempt = driver_name;
+         while(driver_attempt != NULL && *driver_attempt != 0 && video == NULL) {
