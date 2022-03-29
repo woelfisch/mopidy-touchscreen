@@ -11,7 +11,7 @@ After=sound.target
 
 [Service]
 User=mopidy
-Environment="XDG_RUNTIME_DIR=%t" "XDG_CACHE_HOME=/home/mopidy/.cache"
+Environment="XDG_RUNTIME_DIR=/home/mopidy/.local/run" "XDG_CACHE_HOME=/home/mopidy/.cache"
 ExecStartPre=-/usr/bin/ir-keytable -a /etc/rc_maps.cfg
 ExecStart=/usr/local/bin/mopidy --config /etc/mopidy.conf
 
