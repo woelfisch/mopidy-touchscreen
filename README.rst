@@ -35,8 +35,8 @@ Dependencies
 ============
 
 - ``Mopidy`` >= 3.2
-- ``Pykka`` >= 1.1
-- ``pygame`` >= 2.1.2
+- ``Pykka`` >= 3.0
+- ``pygame`` >= 2.1
 - ``musicbrainzngs`` >= 0.7.1
 - ``SDL2`` >= 2.0.21 (see below for required patch)
 

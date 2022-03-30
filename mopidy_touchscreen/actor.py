@@ -10,7 +10,6 @@ import pygame
 import pykka
 from mopidy import core, exceptions
 
-import mopidy_touchscreen.screens
 from .screen_manager import ScreenManager, Screen, ScreenNames
 
 logger = logging.getLogger(__name__)
