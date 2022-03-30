@@ -29,6 +29,8 @@ class MPDEvent:
     def __init__(self, evtype, data):
         self.evtype = evtype
         self.data = data
+    def __str__(self):
+        return 'MPDEvent({}, {})'.format(self.evtype.name, self.data)
 
 class TouchScreen(pykka.ThreadingActor, core.CoreListener):
     def __init__(self, config, core):
@@ -38,7 +40,6 @@ class TouchScreen(pykka.ThreadingActor, core.CoreListener):
         self.running = False
         self.screen = None
         self.screen_manager = None
-        self.mpdqueue = deque()
 
         cfg = config['touchscreen']
         self.cursor = cfg.get('cursor')
@@ -108,12 +109,8 @@ class TouchScreen(pykka.ThreadingActor, core.CoreListener):
         self.get_display_surface(self.screen_size)
         pygame.mouse.set_visible(self.cursor)
 
-        self.screen_manager = ScreenManager(self.screen_size,
-                                            self.core,
-                                            self.cache_dir,
-                                            self.resolution_factor,
-                                            self.start_screen,
-                                            self.main_screen)
+        self.screen_manager = ScreenManager(self.screen_size, self.core, self.cache_dir, self.resolution_factor,
+                                            self.start_screen, self.main_screen)
 
         self.screen_manager.set_inactivity_timeout(self.inactivity_timeout)
 
@@ -124,7 +121,8 @@ class TouchScreen(pykka.ThreadingActor, core.CoreListener):
             clock.tick(12)
 
             while len(self.mpdqueue) > 0:
-                mpd_ev = self.mpdqueue.pop()
+                mpd_ev = self.mpdqueue.popleft()
+                logger.debug(f'mpd_ev={mpd_ev}')
                 try:
                     if mpd_ev.evtype == MPDEventType.Track_Playback_Started:
                         self.screen_manager.track_started(mpd_ev.data)
@@ -162,8 +160,9 @@ class TouchScreen(pykka.ThreadingActor, core.CoreListener):
     def on_start(self):
         logger.info("Attempting to start TouchScreen")
         try:
+            self.mpdqueue = deque()
             self.running = True
-            thread = Thread(target=self.start_thread)
+            thread = Thread(target=self.start_thread, name="Pygame UI")
             thread.start()
         except:
             traceback.print_exc()

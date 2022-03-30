@@ -203,8 +203,7 @@ class ScreenManager:
         self.screens[Screen.Tracklist].track_started(track)
 
     def track_playback_ended(self, tl_track, time_position):
-        self.screens[Screen.Player].track_playback_ended(
-            tl_track, time_position)
+        self.screens[Screen.Player].track_playback_ended(tl_track, time_position)
 
     def event(self, event):
         event = self.input_manager.event(event)
