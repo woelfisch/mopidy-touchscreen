@@ -8,11 +8,12 @@ After=nss-lookup.target
 After=pulseaudio.service
 After=remote-fs.target
 After=sound.target
+After=pigpiod.service
+After=ir-keytable.service
 
 [Service]
 User=mopidy
 Environment="XDG_RUNTIME_DIR=/home/mopidy/.local/run" "XDG_CACHE_HOME=/home/mopidy/.cache"
-ExecStartPre=-/usr/bin/ir-keytable -a /etc/rc_maps.cfg
 ExecStart=/usr/local/bin/mopidy --config /etc/mopidy.conf
 
 [Install]

@@ -7,11 +7,10 @@ import mopidy.core
 import pygame
 from pkg_resources import Requirement, resource_filename
 
-from .graphic_utils import DynamicBackground, \
-    ScreenObjectsManager, TouchAndTextItem
-from .input_manager import InputManager
-from .screens import BaseScreen, Keyboard, LibraryScreen, MainScreen, \
-    MenuScreen, PlaylistScreen, SearchScreen, Tracklist
+from .graphic_utils import DynamicBackground, ScreenObjectsManager, TouchAndTextItem
+from .input_manager import InputManager, InputEvent
+from .screens import BaseScreen, Keyboard, LibraryScreen, MainScreen, MenuScreen, PlaylistScreen, SearchScreen, \
+    Tracklist
 
 logger = logging.getLogger(__name__)
 
@@ -63,13 +62,10 @@ class ScreenManager:
         self.base_size = self.size[1] / self.resolution_factor
 
         self.background = DynamicBackground(self.size)
-        font_icon = resource_filename(
-            Requirement.parse("mopidy-touchscreen"),
-            "mopidy_touchscreen/icomoon.ttf")
+        font_icon = resource_filename(Requirement.parse("mopidy-touchscreen"), "mopidy_touchscreen/icomoon.ttf")
 
-        font_base = resource_filename(
-            Requirement.parse("mopidy-touchscreen"),
-            "mopidy_touchscreen/NotoSans-Regular.ttf")
+        font_base = resource_filename(Requirement.parse("mopidy-touchscreen"),
+                                      "mopidy_touchscreen/NotoSans-Regular.ttf")
         self.fonts['base'] = pygame.font.Font(font_base, int(self.base_size * 0.9))
         self.fonts['icon'] = pygame.font.Font(font_icon, int(self.base_size * 0.9))
 
@@ -83,19 +79,17 @@ class ScreenManager:
 
         x = 0
         i = 0
+        button = None
         while i < 6:
             button = TouchAndTextItem(self.fonts['icon'], menu_icons[i],
-                                      (x, self.size[1] - self.base_size),
-                                      button_size, center=True)
+                                      (x, self.size[1] - self.base_size), button_size, center=True)
             self.down_bar_objects.set_touch_object("menu_" + Screen(i + 1).name, button)
             x = button.get_right_pos()
             i += 1
             button.pos = (button.pos[0], self.size[1] - button.rect_in_pos.size[1])
 
         # Down bar
-        self.down_bar = pygame.Surface(
-            (self.size[0], button.rect_in_pos.size[1]),
-            pygame.SRCALPHA)
+        self.down_bar = pygame.Surface((self.size[0], button.rect_in_pos.size[1]), pygame.SRCALPHA)
         self.down_bar.fill((0, 0, 0, 200))
 
         screen_size = (size[0], self.size[1] - button.rect.size[1])
@@ -107,8 +101,7 @@ class ScreenManager:
                                           self.cache, self.core, self.background),
                 Screen.Tracklist: Tracklist(screen_size, self.base_size, self, self.fonts),
                 Screen.Library: LibraryScreen(screen_size, self.base_size, self, self.fonts),
-                Screen.Playlists: PlaylistScreen(screen_size,
-                                                 self.base_size, self, self.fonts),
+                Screen.Playlists: PlaylistScreen(screen_size, self.base_size, self, self.fonts),
                 Screen.Menu: MenuScreen(screen_size, self.base_size, self, self.fonts, self.core)
             }
         except:
@@ -117,8 +110,7 @@ class ScreenManager:
         self.options_changed()
         self.mute_changed(self.core.mixer.get_mute().get())
         playback_state = self.core.playback.get_state().get()
-        self.playback_state_changed(playback_state,
-                                    playback_state)
+        self.playback_state_changed(playback_state, playback_state)
         self.screens[Screen.Menu].check_connection()
 
         self.change_screen(self.current_screen)
@@ -165,9 +157,7 @@ class ScreenManager:
         return True
 
     def update(self, screen):
-        if self.main_screen is not None and \
-                self.current_screen != self.main_screen and \
-                self.inactivity_timeout():
+        if self.main_screen is not None and self.current_screen != self.main_screen and self.inactivity_timeout():
             self.change_screen(self.main_screen)
 
         update_type = self.get_update_type()
@@ -183,8 +173,7 @@ class ScreenManager:
             if self.keyboard:
                 self.keyboard.update(surface, update_type, rects)
             else:
-                self.screens[self.current_screen]. \
-                    update(surface, update_type, rects)
+                self.screens[self.current_screen].update(surface, update_type, rects)
                 surface.blit(self.down_bar, (0, self.size[1] - self.down_bar.get_size()[1]))
                 self.down_bar_objects.render(surface)
 
@@ -216,18 +205,16 @@ class ScreenManager:
             self.update_type = BaseScreen.update_all
 
     def manage_event(self, event):
-        if event.type == InputManager.click:
-            objects = \
-                self.down_bar_objects.get_touch_objects_in_pos(
-                    event.current_pos)
+        if event.type == InputEvent.action.click:
+            objects = self.down_bar_objects.get_touch_objects_in_pos(event.current_pos)
             return self.click_on_objects(objects, event)
         else:
-            if event.type == InputManager.key and not event.longpress:
+            if event.type == InputEvent.action.key_press and not event.longpress:
                 direction = event.direction
-                if direction == InputManager.right or direction == InputManager.left:
+                if direction == InputEvent.course.right or direction == InputEvent.course.left:
                     if not self.screens[self.current_screen].change_screen(direction):
                         cur = self.current_screen.value
-                        if direction == InputManager.right:
+                        if direction == InputEvent.course.right:
                             cur += 1
                         else:
                             cur -= 1
@@ -339,8 +326,7 @@ class ScreenManager:
         self.update_type = BaseScreen.update_all
 
     def open_keyboard(self, input_listener):
-        self.keyboard = Keyboard(self.size, self.base_size, self,
-                                 self.fonts, input_listener)
+        self.keyboard = Keyboard(self.size, self.base_size, self, self.fonts, input_listener)
         self.update_type = BaseScreen.update_all
 
     def close_keyboard(self):

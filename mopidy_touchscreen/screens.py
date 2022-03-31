@@ -12,10 +12,9 @@ from enum import Enum
 import socket
 from mopidy.models import Track
 
-from .graphic_utils import Progressbar, ScreenObjectsManager, \
-    TextItem, TouchAndTextItem, ListView
+from .graphic_utils import Progressbar, ScreenObjectsManager, TextItem, TouchAndTextItem, ListView
 
-from .input_manager import InputManager
+from .input_manager import InputEvent
 
 logger = logging.getLogger(__name__)
 
@@ -156,7 +155,7 @@ class Keyboard(BaseScreen):
         self.other_objects.render(screen)
 
     def touch_event(self, touch_event):
-        if touch_event.type == InputManager.click:
+        if touch_event.type == InputEvent.action.click:
             keys = self.keyboards[self.current_keyboard].get_touch_objects_in_pos(touch_event.current_pos)
             for key in keys:
                 self.other_objects.get_object("text").add_text(key, False)
@@ -172,7 +171,7 @@ class Keyboard(BaseScreen):
                     text = self.other_objects.get_object("text").text
                     self.listener.text_input(text)
                     self.manager.close_keyboard()
-        elif touch_event.type == InputManager.key:
+        elif touch_event.type == InputEvent.action.key_press:
             if not isinstance(touch_event.unicode, int):
                 if touch_event.unicode == u'\x08':
                     self.other_objects.get_object("text").remove_text(1, False)
@@ -181,15 +180,15 @@ class Keyboard(BaseScreen):
             elif touch_event.direction is not None:
                 x = 0
                 y = 0
-                if touch_event.direction == InputManager.left:
+                if touch_event.direction == InputEvent.course.left:
                     x = -1
-                elif touch_event.direction == InputManager.right:
+                elif touch_event.direction == InputEvent.course.right:
                     x = 1
-                elif touch_event.direction == InputManager.up:
+                elif touch_event.direction == InputEvent.course.up:
                     y = -1
-                elif touch_event.direction == InputManager.down:
+                elif touch_event.direction == InputEvent.course.down:
                     y = 1
-                if touch_event.direction == InputManager.enter:
+                if touch_event.direction == InputEvent.course.enter:
                     self.selected_click()
                 else:
                     self.change_selected(x, y)
@@ -527,10 +526,10 @@ class MainScreen(BaseScreen):
 
         self.track = track
         if not self.is_image_in_cache():
-            thread = Thread(target=self.download_image)
+            thread = Thread(target=self.download_image, name="Download Cover")
             thread.start()
         else:
-            thread = Thread(target=self.load_image)
+            thread = Thread(target=self.load_image, name="Load Cover")
             thread.start()
 
     def stream_title_changed(self, title):
@@ -573,8 +572,8 @@ class MainScreen(BaseScreen):
     def download_image_musicbrainz(self, artist_index):
         found = False
         while _use_musicbrainz and not found and artist_index < len(self.artists):
-            result = musicbrainzngs.search_releases(artist = self.artists[artist_index].name,
-                                                    release = MainScreen.get_track_album_name(self.track), limit = 5)
+            result = musicbrainzngs.search_releases(artist=self.artists[artist_index].name,
+                                                    release=MainScreen.get_track_album_name(self.track), limit=5)
 
             releases = result.get('release-list')
             if releases is None or len(releases) < 1:
@@ -653,47 +652,45 @@ class MainScreen(BaseScreen):
         self.background.set_background_image(image_original)
 
     def touch_event(self, event):
-        if event.type == InputManager.click or event.type == InputManager.long_click:
-            objects = \
-                self.touch_text_manager.get_touch_objects_in_pos(
-                    event.current_pos)
+        if event.type == InputEvent.action.click or event.type == InputEvent.action.long_click:
+            objects = self.touch_text_manager.get_touch_objects_in_pos(event.current_pos)
             if objects is not None:
                 self.click_on_objects(objects, event)
 
-        elif event.type == InputManager.swipe:
-            if event.direction == InputManager.left:
+        elif event.type == InputEvent.action.swipe:
+            if event.direction == InputEvent.course.left:
                 self.core.playback.next()
-            elif event.direction == InputManager.right:
+            elif event.direction == InputEvent.course.right:
                 self.core.playback.previous()
-            elif event.direction == InputManager.up:
+            elif event.direction == InputEvent.course.up:
                 volume = self.core.mixer.get_volume().get() + 10
                 if volume > 100:
                     volume = 100
                 self.core.mixer.set_volume(volume)
-            elif event.direction == InputManager.down:
+            elif event.direction == InputEvent.course.down:
                 volume = self.core.mixer.get_volume().get() - 10
                 if volume < 0:
                     volume = 0
                 self.core.mixer.set_volume(volume)
-        elif event.type == InputManager.key:
-            if event.direction == InputManager.enter:
+        elif event.type == InputEvent.action.key_press:
+            if event.direction == InputEvent.course.enter:
                 self.click_on_objects(["pause_play"], None)
-            elif event.direction == InputManager.up:
+            elif event.direction == InputEvent.course.up:
                 vol = self.core.mixer.get_volume().get()
                 vol += 3
                 if vol > 100:
                     vol = 100
                 self.core.mixer.set_volume(vol)
-            elif event.direction == InputManager.down:
+            elif event.direction == InputEvent.course.down:
                 vol = self.core.mixer.get_volume().get()
                 vol -= 3
                 if vol < 0:
                     vol = 0
                 self.core.mixer.set_volume(vol)
             elif event.longpress:
-                if event.direction == InputManager.left:
+                if event.direction == InputEvent.course.left:
                     self.click_on_objects(["previous"], None)
-                elif event.direction == InputManager.right:
+                elif event.direction == InputEvent.course.right:
                     self.click_on_objects(["next"], None)
 
     def click_on_objects(self, objects, event):
@@ -712,7 +709,7 @@ class MainScreen(BaseScreen):
                     self.change_volume(event)
                 elif key == "pause_play":
                     playback_state = self.core.playback.get_state().get()
-                    if event.type == InputManager.long_click:
+                    if event.type == InputEvent.action.long_click:
                         if playback_state != mopidy.core.PlaybackState.STOPPED:
                             self.core.playback.stop()
                         else:
@@ -738,14 +735,11 @@ class MainScreen(BaseScreen):
 
     def playback_state_changed(self, old_state, new_state):
         if new_state == mopidy.core.PlaybackState.PLAYING:
-            self.touch_text_manager.get_touch_object(
-                "pause_play").set_text(u"\ue615", False)  # |>
+            self.touch_text_manager.get_touch_object("pause_play").set_text(u"\ue615", False)  # |>
         elif new_state == mopidy.core.PlaybackState.PAUSED:
-            self.touch_text_manager.get_touch_object(
-                "pause_play").set_text(u"\ue616", False)  # ||
+            self.touch_text_manager.get_touch_object("pause_play").set_text(u"\ue616", False)  # ||
         elif new_state == mopidy.core.PlaybackState.STOPPED:
-            self.touch_text_manager.get_touch_object(
-                "pause_play").set_text(u"\ue617", False)  # []
+            self.touch_text_manager.get_touch_object("pause_play").set_text(u"\ue617", False)  # []
 
     def volume_changed(self, volume):
         if not self.core.mixer.get_mute().get():
@@ -1042,7 +1036,7 @@ class SearchScreen(BaseScreen):
             self.list_view.set_list(self.results_strings)
 
     def touch_event(self, touch_event):
-        if touch_event.type == InputManager.click:
+        if touch_event.type == InputEvent.action.click:
             clicked = self.list_view.touch_event(touch_event)
             if clicked is not None:
                 self.manager.core.tracklist.clear()
@@ -1067,11 +1061,11 @@ class SearchScreen(BaseScreen):
 
     def change_screen(self, direction):
         mode = self.mode.value
-        if direction == InputManager.right:
+        if direction == InputEvent.course.right:
             if mode < SearchMode.Artist.value:
                 self.set_mode(SearchMode(mode + 1))
                 return True
-        elif direction == InputManager.left:
+        elif direction == InputEvent.course.left:
             if mode > SearchMode.Track.value:
                 self.set_mode(SearchMode(mode - 1))
                 return True

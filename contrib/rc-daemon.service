@@ -1,0 +1,11 @@
+[Unit]
+Description=Run external IR actions
+After=dbus.service
+After=ir-keytable.service
+
+[Service]
+User=root
+ExecStart=/usr/local/bin/rc-daemon.py
+
+[Install]
+WantedBy=multi-user.target

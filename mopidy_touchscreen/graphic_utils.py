@@ -2,15 +2,11 @@ import pygame
 import logging
 import math
 
-from .input_manager import InputManager
+from .input_manager import InputEvent
 
 logger = logging.getLogger(__name__)
 
-change_speed = 2
-
-
 class DynamicBackground:
-
     def __init__(self, size):
         self.image_loaded = False
         self.size = size
@@ -35,8 +31,7 @@ class DynamicBackground:
         if self.image_loaded:
             if self.screen_change_percent < 255:
                 self.surface.fill((0, 0, 0))
-                self.surface_image_last.set_alpha(
-                    255 - self.screen_change_percent)
+                self.surface_image_last.set_alpha(255 - self.screen_change_percent)
                 self.surface_image.set_alpha(self.screen_change_percent)
                 self.surface.blit(self.surface_image_last, (0, 0))
                 self.surface.blit(self.surface_image, (0, 0))
@@ -55,10 +50,8 @@ class DynamicBackground:
             image_size = get_aspect_scale_size(image, self.size)
             target = pygame.transform.smoothscale(image, image_size)
             self.surface_image_last = self.surface_image.copy()
-            pos = (int((self.size[0] - image_size[0]) / 2),
-                   (int(self.size[1] - image_size[1]) / 2))
-            self.surface_image.blit(blur_surf_times(
-                target, self.size[0] / 40, 10), pos)
+            pos = (int((self.size[0] - image_size[0]) / 2), (int(self.size[1] - image_size[1]) / 2))
+            self.surface_image.blit(blur_surf_times(target, self.size[0] / 40, 10), pos)
             self.screen_change_percent = 0
             self.image_loaded = True
         self.update = True
@@ -124,13 +117,9 @@ class ListView:
         self.list_size = len(item_list)
         if self.max_rows < self.list_size:
             self.scrollbar = True
-            scroll_bar = ScrollBar(
-                (self.pos[0] + self.size[0] - self.base_size,
-                 self.pos[1]),
-                (self.base_size, self.size[1]), self.list_size,
-                self.max_rows)
-            self.screen_objects.set_touch_object("scrollbar",
-                                                 scroll_bar)
+            scroll_bar = ScrollBar((self.pos[0] + self.size[0] - self.base_size, self.pos[1]),
+                                   (self.base_size, self.size[1]), self.list_size, self.max_rows)
+            self.screen_objects.set_touch_object("scrollbar", scroll_bar)
         else:
             self.scrollbar = False
         if self.list_size > 0:
@@ -157,9 +146,7 @@ class ListView:
         self.should_update_always = False
         current_y = self.pos[1]
         while i < self.list_size and current_y <= self.pos[1] + self.size[1]:
-            item = TouchAndTextItem(self.font, self.list[i], (
-                self.pos[0],
-                current_y), (width, -1))
+            item = TouchAndTextItem(self.font, self.list[i], (self.pos[0], current_y), (width, -1))
             current_y += item.size[1]
             if not item.fit_horizontal:
                 self.update_keys.append(str(i))
@@ -190,33 +177,28 @@ class ListView:
 
     def touch_event(self, touch_event):
         self.must_update = True
-        if touch_event.type == InputManager.click \
-                or touch_event.type == InputManager.long_click:
-            objects = self.screen_objects.get_touch_objects_in_pos(
-                touch_event.current_pos)
+        if touch_event.type == InputEvent.action.click or touch_event.type == InputEvent.action.long_click:
+            objects = self.screen_objects.get_touch_objects_in_pos(touch_event.current_pos)
             if objects is not None:
                 for key in objects:
                     if key == "scrollbar":
-                        direction = \
-                            self.screen_objects.get_touch_object(
-                                key).touch(touch_event.current_pos)
+                        direction = self.screen_objects.get_touch_object(key).touch(touch_event.current_pos)
                         if direction != 0:
                             self.move_to(direction)
                     else:
                         return int(key)
-        elif (touch_event.type == InputManager.key and
-              self.selected is not None):
-            if touch_event.direction == InputManager.enter:
+        elif (touch_event.type == InputEvent.action.key_press and self.selected is not None):
+            if touch_event.direction == InputEvent.course.enter:
                 if self.selected is not None:
                     return self.selected
-            elif touch_event.direction == InputManager.up:
+            elif touch_event.direction == InputEvent.course.up:
                 self.set_selected(self.selected - 1)
-            elif touch_event.direction == InputManager.down:
+            elif touch_event.direction == InputEvent.course.down:
                 self.set_selected(self.selected + 1)
-        elif touch_event.type == InputManager.swipe:
-            if touch_event.direction == InputManager.up:
+        elif touch_event.type == InputEvent.action.swipe:
+            if touch_event.direction == InputEvent.course.up:
                 self.move_to(-1)
-            elif touch_event.direction == InputManager.down:
+            elif touch_event.direction == InputEvent.course.down:
                 self.move_to(1)
 
     # Scroll to direction
@@ -230,17 +212,13 @@ class ListView:
                 if self.current_item + self.max_rows > self.list_size:
                     self.current_item = self.list_size - self.max_rows
                 self.load_new_item_position(self.current_item)
-                self.screen_objects.get_touch_object(
-                    "scrollbar").set_item(
-                    self.current_item)
+                self.screen_objects.get_touch_object("scrollbar").set_item(self.current_item)
             elif direction == -1:
                 self.current_item -= self.max_rows
                 if self.current_item < 0:
                     self.current_item = 0
                 self.load_new_item_position(self.current_item)
-                self.screen_objects.get_touch_object(
-                    "scrollbar").set_item(
-                    self.current_item)
+                self.screen_objects.get_touch_object("scrollbar").set_item(self.current_item)
             self.set_active(self.active)
 
     # Set active items
@@ -248,16 +226,12 @@ class ListView:
         self.must_update = True
         for number in self.active:
             try:
-                self.screen_objects.get_touch_object(
-                    str(number)).set_active(
-                    False)
+                self.screen_objects.get_touch_object(str(number)).set_active(False)
             except KeyError:
                 pass
         for number in active:
             try:
-                self.screen_objects.get_touch_object(
-                    str(number)).set_active(
-                    True)
+                self.screen_objects.get_touch_object(str(number)).set_active(True)
             except KeyError:
                 pass
         self.active = active
@@ -267,16 +241,12 @@ class ListView:
         if -1 < selected < len(self.list):
             if self.selected is not None:
                 try:
-                    self.screen_objects.get_touch_object(
-                        str(self.selected)).set_selected(
-                        False)
+                    self.screen_objects.get_touch_object(str(self.selected)).set_selected(False)
                 except KeyError:
                     pass
             if selected is not None:
                 try:
-                    self.screen_objects.get_touch_object(
-                        str(selected)).set_selected(
-                        True)
+                    self.screen_objects.get_touch_object(str(selected)).set_selected(True)
                 except KeyError:
                     pass
             self.selected = selected
@@ -295,9 +265,7 @@ class ListView:
         self.must_update = True
         if self.selected is not None:
             try:
-                self.screen_objects.get_touch_object(
-                    str(self.selected)).set_selected(
-                    True)
+                self.screen_objects.get_touch_object(str(self.selected)).set_selected(True)
             except KeyError:
                 pass
 
@@ -372,9 +340,7 @@ class BaseItem:
         self.pos = pos
         self.size = size
         self.rect = pygame.Rect(0, 0, self.size[0], self.size[1])
-        self.rect_in_pos = pygame.Rect(self.pos[0], self.pos[1],
-                                       self.size[0],
-                                       self.size[1])
+        self.rect_in_pos = pygame.Rect(self.pos[0], self.pos[1], self.size[0], self.size[1])
 
     def get_right_pos(self):
         return self.pos[0] + self.size[0]
@@ -386,9 +352,7 @@ class BaseItem:
 class TextItem(BaseItem):
     scroll_speed = 2
 
-    def __init__(self, font, text, pos, size, center=False, background=None,
-                 scroll_no_fit=True):
-
+    def __init__(self, font, text, pos, size, center=False, background=None, scroll_no_fit=True):
         logger.debug(f'type of text is {type(text)}')
 
         self.font = font
@@ -407,16 +371,14 @@ class TextItem(BaseItem):
         else:
             BaseItem.__init__(self, pos, self.font.size(text))
         if size is not None:
-            if self.pos[0] + self.box.get_rect().width > pos[0] + \
-                    size[0]:
+            if self.pos[0] + self.box.get_rect().width > pos[0] + size[0]:
                 self.fit_horizontal = False
                 self.step = 0
                 self.step_2 = None
                 self.scroll_white_gap = self.font.get_height() * 4
             else:
                 self.fit_horizontal = True
-            if self.pos[1] + self.box.get_rect().height > pos[1] + \
-                    size[1]:
+            if self.pos[1] + self.box.get_rect().height > pos[1] + size[1]:
                 self.fit_vertical = False
             else:
                 self.fit_vertical = True
@@ -427,18 +389,14 @@ class TextItem(BaseItem):
         self.center = center
         if self.center:
             if self.fit_horizontal:
-                self.margin = (self.size[0] -
-                               self.box.get_rect().width) / 2
+                self.margin = (self.size[0] - self.box.get_rect().width) / 2
 
     def update(self):
         if self.scroll_no_fit and not self.fit_horizontal:
             self.step += TextItem.scroll_speed
             if self.step_2 is None:
-                if (self.box.get_rect().width - self.step +
-                    self.scroll_white_gap) < self.size[0]:
-                    self.step_2 = \
-                        self.box.get_rect().width - \
-                        self.step + self.scroll_white_gap
+                if (self.box.get_rect().width - self.step + self.scroll_white_gap) < self.size[0]:
+                    self.step_2 = self.box.get_rect().width - self.step + self.scroll_white_gap
             else:
                 self.step_2 -= TextItem.scroll_speed
                 if self.step_2 < 0:
@@ -454,36 +412,25 @@ class TextItem(BaseItem):
             pygame.draw.rect(surface, (0, 0, 0), self.rect_in_pos, 1)
         if self.fit_horizontal:
             surface.blit(
-                self.box, ((self.pos[0] + self.margin),
-                           self.pos[1]), area=self.rect)
+                self.box, ((self.pos[0] + self.margin), self.pos[1]), area=self.rect)
         else:
             if self.scroll_no_fit:
-                surface.blit(self.box, self.pos,
-                             area=pygame.Rect(self.step, 0, self.size[0],
-                                              self.size[1]))
+                surface.blit(self.box, self.pos, area=pygame.Rect(self.step, 0, self.size[0], self.size[1]))
                 if self.step_2 is not None:
-                    surface.blit(self.box, (self.pos[0] + self.step_2,
-                                            self.pos[1]),
-                                 area=pygame.Rect(0, 0,
-                                                  self.size[0] -
-                                                  self.step_2,
-                                                  self.size[1]))
+                    surface.blit(self.box, (self.pos[0] + self.step_2, self.pos[1]),
+                                 area=pygame.Rect(0, 0, self.size[0] - self.step_2, self.size[1]))
             else:
                 step = self.box.get_rect().width - self.size[0]
-                surface.blit(self.box, self.pos,
-                             area=pygame.Rect(step, 0, self.size[0],
-                                              self.size[1]))
+                surface.blit(self.box, self.pos, area=pygame.Rect(step, 0, self.size[0], self.size[1]))
 
     def set_text(self, text, change_size):
         if text != self.text:
             if change_size:
-                TextItem.__init__(self, self.font, text, self.pos,
-                                  None, self.center, self.background,
-                                  self.scroll_no_fit)
+                TextItem.__init__(self, self.font, text, self.pos, None, self.center,
+                                  self.background, self.scroll_no_fit)
             else:
-                TextItem.__init__(self, self.font, text, self.pos,
-                                  self.size, self.center, self.background,
-                                  self.scroll_no_fit)
+                TextItem.__init__(self, self.font, text, self.pos, self.size, self.center,
+                                  self.background, self.scroll_no_fit)
 
     def add_text(self, add_text, change_size):
         self.set_text(self.text + add_text, change_size)
@@ -501,11 +448,9 @@ class TouchObject(BaseItem):
         self.selected_box = self.selected_box.convert_alpha()
         self.selected_box.fill((0, 0, 0, 128))
         self.selected_box_rectangle = pygame.Surface(size, pygame.SRCALPHA)
-        self.selected_box_rectangle = \
-            self.selected_box_rectangle.convert_alpha()
+        self.selected_box_rectangle = self.selected_box_rectangle.convert_alpha()
         pygame.draw.rect(self.selected_box_rectangle, (255, 255, 255),
-                         self.selected_box_rectangle.get_rect(),
-                         int(size[1] / 10) + 1)
+                         self.selected_box_rectangle.get_rect(), int(size[1] / 10) + 1)
 
     def is_pos_inside(self, pos):
         return self.rect_in_pos.collidepoint(pos)
@@ -531,15 +476,15 @@ class TouchObject(BaseItem):
 
 
 class TouchAndTextItem(TouchObject, TextItem):
-    def __init__(self, font, text, pos, size, center=False, background=None,
-                 scroll_no_fit=True):
+    def __init__(self, font, text, pos, size, center=False, background=None, scroll_no_fit=True):
+
         TextItem.__init__(self, font, text, pos, size, center=center,
                           background=background, scroll_no_fit=scroll_no_fit)
+
         TouchObject.__init__(self, pos, self.size)
         self.active_color = (0, 150, 255)
         self.normal_box = self.box
-        self.active_box = self.font.render(text, True,
-                                           self.active_color)
+        self.active_box = self.font.render(text, True, self.active_color)
 
     def update(self):
         return TextItem.update(self)
@@ -547,8 +492,7 @@ class TouchAndTextItem(TouchObject, TextItem):
     def set_text(self, text, change_size):
         TextItem.set_text(self, text, change_size)
         self.normal_box = self.box
-        self.active_box = self.font.render(text, True,
-                                           self.active_color)
+        self.active_box = self.font.render(text, True, self.active_color)
 
     def set_active(self, active):
         TouchObject.set_active(self, active)
@@ -570,8 +514,7 @@ class Progressbar(TouchObject):
         self.max = max_value
         self.back_color = (0, 0, 0, 128)
         self.main_color = (0, 150, 255, 150)
-        self.surface = pygame.Surface(self.size, pygame.SRCALPHA) \
-            .convert_alpha()
+        self.surface = pygame.Surface(self.size, pygame.SRCALPHA).convert_alpha()
         self.surface.fill(self.back_color)
         self.value_text = value_text
 
@@ -579,11 +522,8 @@ class Progressbar(TouchObject):
         self.text.set_text(str(self.value), True)
 
         # Rectangle
-        self.rectangle = pygame.Surface(size, pygame.SRCALPHA) \
-            .convert_alpha()
-        pygame.draw.rect(self.rectangle, (255, 255, 255),
-                         self.rectangle.get_rect(),
-                         int(size[1] / 20) + 1)
+        self.rectangle = pygame.Surface(size, pygame.SRCALPHA).convert_alpha()
+        pygame.draw.rect(self.rectangle, (255, 255, 255), self.rectangle.get_rect(), int(size[1] / 20) + 1)
 
     def render(self, surface):
         surface.blit(self.surface, self.pos)
@@ -612,30 +552,26 @@ class Progressbar(TouchObject):
 
 class ScrollBar(TouchObject):
     def __init__(self, pos, size, max_value, items_on_screen):
-        BaseItem.__init__(self, pos,
-                          (pos[0] + size[0], pos[1] + size[1]))
+        BaseItem.__init__(self, pos, (pos[0] + size[0], pos[1] + size[1]))
         self.pos = pos
         self.size = size
         self.max = max_value
         self.items_on_screen = items_on_screen
         self.current_item = 0
-        self.back_bar = pygame.Surface(self.size, pygame.SRCALPHA) \
-            .convert_alpha()
+        self.back_bar = pygame.Surface(self.size, pygame.SRCALPHA).convert_alpha()
         self.back_bar.fill((255, 255, 255, 128))
         self.bar_pos = 0
         if self.max < 1:
             self.bar_size = self.size[1]
         else:
             self.bar_size = math.ceil(
-                float(self.items_on_screen) / float(self.max) * float(
-                    self.size[1]))
+                float(self.items_on_screen) / float(self.max) * float(self.size[1]))
         self.bar = pygame.Surface((self.size[0], self.bar_size)).convert()
         self.bar.fill((255, 255, 255))
 
     def render(self, surface):
         surface.blit(self.back_bar, self.pos)
-        surface.blit(self.bar,
-                     (self.pos[0], self.pos[1] + self.bar_pos))
+        surface.blit(self.bar, (self.pos[0], self.pos[1] + self.bar_pos))
 
     def touch(self, pos):
         if pos[1] < self.pos[1] + self.bar_pos:
@@ -648,6 +584,4 @@ class ScrollBar(TouchObject):
     def set_item(self, current_item):
         assert (isinstance(current_item, int))
         self.current_item = current_item
-        self.bar_pos = float(self.current_item) / float(
-            self.max) * float(
-            self.size[1])
+        self.bar_pos = float(self.current_item) / float(self.max) * float(self.size[1])

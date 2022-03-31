@@ -4,7 +4,7 @@ import re
 import traceback
 from threading import Thread
 from collections import deque
-from enum import Enum, auto
+from enum import Enum
 
 import pygame
 import pykka
@@ -14,24 +14,21 @@ from .screen_manager import ScreenManager, Screen, ScreenNames
 
 logger = logging.getLogger(__name__)
 
-class MPDEventType(Enum):
-    Track_Playback_Started = auto()
-    Track_Playback_Ended = auto()
-    Playback_State_Changed = auto()
-    Volume_Changed = auto()
-    Tracklist_Changed = auto()
-    Options_Changed = auto()
-    Playlists_Loaded = auto()
-    Stream_Title_Changed = auto()
-
 class MPDEvent:
+    Type = Enum("Type",
+            "Track_Playback_Started Track_Playback_Ended Playback_State_Changed "
+            "Volume_Changed Tracklist_Changed Options_Changed Playlists_Loaded Stream_Title_Changed")
+
     def __init__(self, evtype, data):
         self.evtype = evtype
         self.data = data
+
     def __str__(self):
         return 'MPDEvent({}, {})'.format(self.evtype.name, self.data)
 
 class TouchScreen(pykka.ThreadingActor, core.CoreListener):
+    mpdqueue = None
+
     def __init__(self, config, core):
         super(TouchScreen, self).__init__()
         logger.info("Instantiated TouchScreen")
@@ -68,7 +65,7 @@ class TouchScreen(pykka.ThreadingActor, core.CoreListener):
         os.environ["SDL_PATH_DSP"] = cfg.get('sdl_path_dsp')
 
         video_device_idx = cfg.get('sdl_video_device_index')
-        if  video_device_idx == "none":
+        if video_device_idx == "none":
             video_device = cfg.get("sdl_video_device")
             vd_link = ""
             if video_device != "none":
@@ -93,7 +90,7 @@ class TouchScreen(pykka.ThreadingActor, core.CoreListener):
     def get_display_surface(self, size):
         logger.info("getting display surface of size {}".format(size))
         try:
-            flags = 0 # pygame.OPENGL
+            flags = 0  # pygame.OPENGL
             if self.fullscreen:
                 flags |= pygame.FULLSCREEN
             else:
@@ -123,21 +120,21 @@ class TouchScreen(pykka.ThreadingActor, core.CoreListener):
                 mpd_ev = self.mpdqueue.popleft()
                 logger.debug(f'mpd_ev={mpd_ev}')
                 try:
-                    if mpd_ev.evtype == MPDEventType.Track_Playback_Started:
+                    if mpd_ev.evtype == MPDEvent.Type.Track_Playback_Started:
                         self.screen_manager.track_started(mpd_ev.data)
-                    elif mpd_ev.evtype == MPDEventType.Track_Playback_Ended:
+                    elif mpd_ev.evtype == MPDEvent.Type.Track_Playback_Ended:
                         self.screen_manager.track_playback_ended(mpd_ev.data["tl_track"], mpd_ev.data["time_position"])
-                    elif mpd_ev.evtype == MPDEventType.Volume_Changed:
+                    elif mpd_ev.evtype == MPDEvent.Type.Volume_Changed:
                         self.screen_manager.volume_changed(mpd_ev.data)
-                    elif mpd_ev.evtype == MPDEventType.Playback_State_Changed:
+                    elif mpd_ev.evtype == MPDEvent.Type.Playback_State_Changed:
                         self.screen_manager.playback_state_changed(mpd_ev.data["old_state"], mpd_ev.data["new_state"])
-                    elif mpd_ev.evtype == MPDEventType.Tracklist_Changed:
+                    elif mpd_ev.evtype == MPDEvent.Type.Tracklist_Changed:
                         self.screen_manager.tracklist_changed()
-                    elif mpd_ev.evtype == MPDEventType.Options_Changed:
+                    elif mpd_ev.evtype == MPDEvent.Type.Options_Changed:
                         self.screen_manager.options_changed()
-                    elif mpd_ev.evtype == MPDEventType.Playlists_Loaded:
+                    elif mpd_ev.evtype == MPDEvent.Type.Playlists_Loaded:
                         self.screen_manager.playlists_loaded()
-                    elif mpd_ev.evtype == MPDEventType.Stream_Title_Changed:
+                    elif mpd_ev.evtype == MPDEvent.Type.Stream_Title_Changed:
                         self.screen_manager.stream_title_changed(mpd_ev.data)
                 except:
                     traceback.print_exc()
@@ -170,27 +167,27 @@ class TouchScreen(pykka.ThreadingActor, core.CoreListener):
         self.running = False
 
     def track_playback_started(self, tl_track):
-        self.mpdqueue.append(MPDEvent(MPDEventType.Track_Playback_Started, tl_track))
+        self.mpdqueue.append(MPDEvent(MPDEvent.Type.Track_Playback_Started, tl_track))
 
     def track_playback_ended(self, tl_track, time_position):
-        self.mpdqueue.append(MPDEvent(MPDEventType.Track_Playback_Ended,
+        self.mpdqueue.append(MPDEvent(MPDEvent.Type.Track_Playback_Ended,
                                       {"tl_track": tl_track, "time_position": time_position}))
 
     def volume_changed(self, volume):
-        self.mpdqueue.append(MPDEvent(MPDEventType.Volume_Changed, volume))
+        self.mpdqueue.append(MPDEvent(MPDEvent.Type.Volume_Changed, volume))
 
     def playback_state_changed(self, old_state, new_state):
-        self.mpdqueue.append(MPDEvent(MPDEventType.Playback_State_Changed,
+        self.mpdqueue.append(MPDEvent(MPDEvent.Type.Playback_State_Changed,
                                       {"old_state": old_state, "new_state": new_state}))
 
     def tracklist_changed(self):
-        self.mpdqueue.append(MPDEvent(MPDEventType.Tracklist_Changed, None))
+        self.mpdqueue.append(MPDEvent(MPDEvent.Type.Tracklist_Changed, None))
 
     def options_changed(self):
-        self.mpdqueue.append(MPDEvent(MPDEventType.Options_Changed, None))
+        self.mpdqueue.append(MPDEvent(MPDEvent.Type.Options_Changed, None))
 
     def playlists_loaded(self):
-        self.mpdqueue.append(MPDEvent(MPDEventType.Playlists_Loaded, None))
+        self.mpdqueue.append(MPDEvent(MPDEvent.Type.Playlists_Loaded, None))
 
     def stream_title_changed(self, title):
-        self.mpdqueue.append(MPDEvent(MPDEventType.Stream_Title_Changed, title))
+        self.mpdqueue.append(MPDEvent(MPDEvent.Type.Stream_Title_Changed, title))

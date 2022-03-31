@@ -1,0 +1,11 @@
+[Unit]
+Description=Load IR keytable
+After=dbus.service
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/bin/ir-keytable -a /etc/rc_maps.cfg
+
+[Install]
+WantedBy=multi-user.target
