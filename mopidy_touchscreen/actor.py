@@ -101,6 +101,7 @@ class TouchScreen(pykka.ThreadingActor, core.CoreListener):
 
     def start_thread(self):
         pygame.init()
+        logger.info(f"Pygame {pygame.version.ver} SDL {pygame.version.SDL}")
         pygame.display.set_caption("Mopidy-Touchscreen")
         self.get_display_surface(self.screen_size)
         pygame.mouse.set_visible(self.cursor)

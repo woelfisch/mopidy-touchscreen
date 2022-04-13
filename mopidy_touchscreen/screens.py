@@ -4,6 +4,7 @@ import mopidy.models
 import hashlib
 import logging
 import os
+import traceback
 import time
 import urllib.request
 import urllib.parse
@@ -674,7 +675,7 @@ class MainScreen(BaseScreen):
                 self.core.mixer.set_volume(volume)
         elif event.type == InputEvent.action.key_press:
             if event.direction == InputEvent.course.enter:
-                self.click_on_objects(["pause_play"], None)
+                self.click_on_objects(["pause_play"], event)
             elif event.direction == InputEvent.course.up:
                 vol = self.core.mixer.get_volume().get()
                 vol += 3
@@ -689,17 +690,21 @@ class MainScreen(BaseScreen):
                 self.core.mixer.set_volume(vol)
             elif event.longpress:
                 if event.direction == InputEvent.course.left:
-                    self.click_on_objects(["previous"], None)
+                    self.click_on_objects(["previous"], event)
                 elif event.direction == InputEvent.course.right:
-                    self.click_on_objects(["next"], None)
+                    self.click_on_objects(["next"], event)
 
     def click_on_objects(self, objects, event):
+        try:
+            assert event is not None
+        except AssertionError:
+            traceback.print_exc()
+            return
+
         if objects is not None:
             for key in objects:
                 if key == "time_progress":
-                    value = self.touch_text_manager.get_touch_object(
-                        key).get_pos_value(
-                        event.current_pos)
+                    value = self.touch_text_manager.get_touch_object(key).get_pos_value(event.current_pos)
                     self.core.playback.seek(value)
                 elif key == "previous":
                     self.core.playback.previous()
